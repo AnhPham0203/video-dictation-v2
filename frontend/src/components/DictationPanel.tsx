@@ -51,6 +51,13 @@ export const DictationPanel = ({
     }
   }, [currentSentence]);
 
+  const sanitizeSpecialSymbols = (value: string) =>
+    value
+      .replace(/♪/g, "")
+      .replace(/[’‘]/g, "'")
+      .replace(/[“”]/g, '"')
+      .replace(/…/g, "");
+
   const normalizeWord = (word: string | null | undefined) => {
     if (!word) return "";
     return word
@@ -62,8 +69,10 @@ export const DictationPanel = ({
   const maskWord = (word: string) => "*".repeat(word.length || 1);
 
   const handleCheck = () => {
-    const trimmedInput = userInput.trim();
-    const expectedNormalized = currentSentence.trim();
+    const sanitizedInput = sanitizeSpecialSymbols(userInput);
+    const trimmedInput = sanitizedInput.trim();
+    const sanitizedSentence = sanitizeSpecialSymbols(currentSentence);
+    const expectedNormalized = sanitizedSentence.trim();
 
     if (awaitingConfirm && trimmedInput === expectedNormalized) {
       handleNextSentence();
@@ -74,8 +83,8 @@ export const DictationPanel = ({
       return;
     }
 
-    const expectedWords = currentSentence.trim().split(/\s+/).filter(Boolean);
-    const inputWords = userInput.trim().split(/\s+/).filter(Boolean);
+    const expectedWords = sanitizedSentence.trim().split(/\s+/).filter(Boolean);
+    const inputWords = sanitizedInput.trim().split(/\s+/).filter(Boolean);
 
     let correctCount = 0;
 
@@ -222,7 +231,7 @@ export const DictationPanel = ({
           placeholder="Type what you hear..."
           value={userInput}
           onChange={(e) => {
-            setUserInput(e.target.value);
+            setUserInput(sanitizeSpecialSymbols(e.target.value));
             if (feedback) {
               setFeedback(null);
             }
@@ -277,13 +286,8 @@ export const DictationPanel = ({
                   >
                     {displayText}
                     {!isCorrect && !isMissing && (
-                      <span className="ml-1 text-xs italic text-red-700">
+                      <span className="ml-1  italic text-red-800">
                         → {item.expected}
-                      </span>
-                    )}
-                    {isMissing && (
-                      <span className="ml-1 text-xs italic text-red-700">
-                        (thiếu)
                       </span>
                     )}
                   </span>
@@ -296,7 +300,7 @@ export const DictationPanel = ({
                   className="rounded bg-yellow-100 px-2 py-1 text-yellow-800"
                 >
                   {extra.masked}
-                  <span className="ml-1 text-xs italic text-yellow-700">
+                  <span className="ml-1 italic text-yellow-700">
                     (thừa)
                   </span>
                 </span>
@@ -335,12 +339,12 @@ export const DictationPanel = ({
         </Card>
 
         {/* Pronunciation Guide */}
-        {/* <Card className="p-4 bg-secondary">
+        <Card className="p-4 bg-secondary">
           <p className="text-sm text-muted-foreground mb-2">Pronunciation:</p>
           <div className="text-lg leading-relaxed">
             {getPronunciation(currentSentence)}
           </div>
-        </Card> */}
+        </Card>
       </div>
     </div>
   );

@@ -18,6 +18,20 @@ interface Sentence {
   end: number;
 }
 
+const SEGMENT_END_PADDING = 0.1;
+
+const getSegmentBounds = (sentence: Sentence) => {
+  const adjustedEnd = Math.max(
+    sentence.start,
+    sentence.end - SEGMENT_END_PADDING
+  );
+
+  return {
+    start: sentence.start,
+    end: adjustedEnd,
+  };
+};
+
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -160,11 +174,10 @@ const Index = () => {
 
   const playCurrentSentence = (index?: number) => {
     const sentenceIndex = index !== undefined ? index : currentSentenceIndex;
-    if (sentences[sentenceIndex]) {
-      setSeekTo({
-        start: sentences[sentenceIndex].start,
-        end: sentences[sentenceIndex].end,
-      });
+    const sentence = sentences[sentenceIndex];
+
+    if (sentence) {
+      setSeekTo(getSegmentBounds(sentence));
     }
   };
 
@@ -232,10 +245,7 @@ const Index = () => {
               onPlaybackComplete={() => setSeekTo(null)}
               currentSegment={
                 sentences[currentSentenceIndex]
-                  ? {
-                      start: sentences[currentSentenceIndex].start,
-                      end: sentences[currentSentenceIndex].end,
-                    }
+                  ? getSegmentBounds(sentences[currentSentenceIndex])
                   : null
               }
             />
