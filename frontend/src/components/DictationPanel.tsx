@@ -1,0 +1,347 @@
+import { useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Play, RotateCcw, Mic } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Card } from "@/components/ui/card";
+
+interface DictationPanelProps {
+  currentSentence: string;
+  sentenceIndex: number;
+  totalSentences: number;
+  translation: string;
+  onNext: () => void;
+  onPrevious: () => void;
+  onCheck: (userInput: string) => void;
+  onPlaySentence: () => void;
+}
+
+export const DictationPanel = ({
+  currentSentence,
+  sentenceIndex,
+  totalSentences,
+  translation,
+  onNext,
+  onPrevious,
+  onCheck,
+  onPlaySentence,
+}: DictationPanelProps) => {
+  const [userInput, setUserInput] = useState("");
+  const [feedback, setFeedback] = useState<{
+    type: "correct" | "incorrect" | "partial";
+    message: string;
+    accuracy: number;
+    breakdown: Array<{
+      expected: string;
+      maskedExpected: string;
+      user?: string | null;
+      status: "correct" | "incorrect" | "missing";
+    }>;
+    extraWords: Array<{ word: string; masked: string }>;
+  } | null>(null);
+  const [awaitingConfirm, setAwaitingConfirm] = useState(false);
+
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    setUserInput("");
+    setFeedback(null);
+    setAwaitingConfirm(false);
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [currentSentence]);
+
+  const normalizeWord = (word: string | null | undefined) => {
+    if (!word) return "";
+    return word
+      .toLowerCase()
+      .replace(/[.,!?;:'"()\[\]{}]/g, "")
+      .trim();
+  };
+
+  const maskWord = (word: string) => "*".repeat(word.length || 1);
+
+  const handleCheck = () => {
+    const trimmedInput = userInput.trim();
+    const expectedNormalized = currentSentence.trim();
+
+    if (awaitingConfirm && trimmedInput === expectedNormalized) {
+      handleNextSentence();
+      return;
+    }
+
+    if (!trimmedInput) {
+      return;
+    }
+
+    const expectedWords = currentSentence.trim().split(/\s+/).filter(Boolean);
+    const inputWords = userInput.trim().split(/\s+/).filter(Boolean);
+
+    let correctCount = 0;
+
+    const breakdown = expectedWords.map((expectedWord, index) => {
+      const userWord = inputWords[index] ?? null;
+      const maskedExpected = maskWord(expectedWord);
+      const normalizedExpected = normalizeWord(expectedWord);
+      const normalizedInput = normalizeWord(userWord);
+
+      if (!userWord) {
+        return {
+          expected: expectedWord,
+          maskedExpected,
+          user: null,
+          status: "missing" as const,
+        };
+      }
+
+      if (normalizedExpected === normalizedInput) {
+        correctCount += 1;
+        return {
+          expected: expectedWord,
+          maskedExpected,
+          user: userWord,
+          status: "correct" as const,
+        };
+      }
+
+      return {
+        expected: expectedWord,
+        maskedExpected,
+        user: userWord,
+        status: "incorrect" as const,
+      };
+    });
+
+    const extraWords = inputWords.slice(expectedWords.length).map((word) => ({
+      word,
+      masked: maskWord(word),
+    }));
+
+    const accuracy = expectedWords.length
+      ? Math.round((correctCount / expectedWords.length) * 100)
+      : 0;
+
+    const isPerfect =
+      accuracy === 100 &&
+      extraWords.length === 0 &&
+      breakdown.every((item) => item.status === "correct");
+
+    const hasAnyCorrect = breakdown.some((item) => item.status === "correct");
+
+    setFeedback({
+      type: isPerfect ? "correct" : hasAnyCorrect ? "partial" : "incorrect",
+      message: isPerfect
+        ? awaitingConfirm
+          ? "✔ Chính xác! Tuyệt vời!"
+          : "✔ Chính xác! Nhấn Enter lần nữa để sang câu mới."
+        : hasAnyCorrect
+        ? "Một số từ đã đúng, tiếp tục chỉnh sửa nhé."
+        : "Chưa chính xác, hãy xem lại các từ được tô đỏ.",
+      accuracy,
+      breakdown,
+      extraWords,
+    });
+
+    onCheck(userInput);
+
+    if (isPerfect) {
+      setAwaitingConfirm(true);
+      setUserInput(currentSentence);
+      return;
+    }
+
+    setAwaitingConfirm(false);
+  };
+
+  const handleNextSentence = () => {
+    setUserInput("");
+    setFeedback(null);
+    onNext();
+  };
+
+  const handlePreviousSentence = () => {
+    setUserInput("");
+    setFeedback(null);
+    onPrevious();
+  };
+
+  const getPronunciation = (text: string) => {
+    return text.split(" ").map((word, idx) => (
+      <span
+        key={idx}
+        className="inline-block mr-2 border-b-2 border-dotted border-pronunciation-dot"
+      >
+        {word}
+      </span>
+    ));
+  };
+
+  return (
+    <div className="h-full flex flex-col gap-6 p-6 bg-panel-bg rounded-lg">
+      {/* Progress and Navigation */}
+      <div className="flex items-center justify-between">
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={handlePreviousSentence}
+          disabled={sentenceIndex === 0}
+          className="hover:bg-secondary"
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </Button>
+
+        <div className="flex items-center gap-3">
+          <Button
+            size="icon"
+            variant="default"
+            className="bg-primary hover:bg-primary/90"
+            onClick={onPlaySentence}
+          >
+            <Play className="h-4 w-4" />
+          </Button>
+          <span className="text-sm font-medium text-muted-foreground">
+            {sentenceIndex + 1} / {totalSentences}
+          </span>
+        </div>
+
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={handleNextSentence}
+          disabled={sentenceIndex === totalSentences - 1}
+          className="hover:bg-secondary"
+        >
+          <ChevronRight className="h-5 w-5" />
+        </Button>
+      </div>
+
+      {/* Input Area */}
+      <div className="flex-1 flex flex-col gap-4">
+        <Textarea
+          ref={textareaRef}
+          placeholder="Type what you hear..."
+          value={userInput}
+          onChange={(e) => {
+            setUserInput(e.target.value);
+            if (feedback) {
+              setFeedback(null);
+            }
+            if (awaitingConfirm) {
+              setAwaitingConfirm(false);
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              if (userInput.trim()) {
+                handleCheck();
+              }
+            }
+          }}
+          className="min-h-[120px] bg-background border-input focus:border-input-focus focus:ring-input-focus resize-none text-lg"
+        />
+
+        {feedback && (
+          <div className="rounded-md border border-border bg-card/60 p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <p
+                className={`font-semibold ${
+                  feedback.type === "correct" ? "text-correct" : "text-error"
+                }`}
+              >
+                {feedback.message}
+              </p>
+              <span className="text-sm font-medium text-muted-foreground">
+                Độ chính xác: {feedback.accuracy}%
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-2 text-lg">
+              {feedback.breakdown.map((item, index) => {
+                const isCorrect = item.status === "correct";
+                const isMissing = item.status === "missing";
+                const displayText = isCorrect
+                  ? item.expected
+                  : isMissing
+                  ? item.maskedExpected
+                  : item.maskedExpected;
+
+                return (
+                  <span
+                    key={`${item.expected}-${index}`}
+                    className={`rounded px-2 py-1 ${
+                      isCorrect
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
+                    {displayText}
+                    {!isCorrect && !isMissing && (
+                      <span className="ml-1 text-xs italic text-red-700">
+                        → {item.expected}
+                      </span>
+                    )}
+                    {isMissing && (
+                      <span className="ml-1 text-xs italic text-red-700">
+                        (thiếu)
+                      </span>
+                    )}
+                  </span>
+                );
+              })}
+
+              {feedback.extraWords.map((extra, index) => (
+                <span
+                  key={`extra-${extra.word}-${index}`}
+                  className="rounded bg-yellow-100 px-2 py-1 text-yellow-800"
+                >
+                  {extra.masked}
+                  <span className="ml-1 text-xs italic text-yellow-700">
+                    (thừa)
+                  </span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <Button
+            onClick={handleCheck}
+            className="flex-1 bg-primary hover:bg-primary/90"
+          >
+            Check
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setUserInput("")}
+            className="hover:bg-secondary"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="hover:bg-secondary">
+            <Mic className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Translation */}
+        <Card className="p-4 bg-secondary">
+          <p className="text-sm text-muted-foreground mb-2">
+            Vietnamese Translation:
+          </p>
+          <p className="text-foreground">{translation}</p>
+          <p className="text-xs text-muted-foreground mt-2">Translated by AI</p>
+        </Card>
+
+        {/* Pronunciation Guide */}
+        {/* <Card className="p-4 bg-secondary">
+          <p className="text-sm text-muted-foreground mb-2">Pronunciation:</p>
+          <div className="text-lg leading-relaxed">
+            {getPronunciation(currentSentence)}
+          </div>
+        </Card> */}
+      </div>
+    </div>
+  );
+};
