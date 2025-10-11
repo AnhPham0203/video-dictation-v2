@@ -5,6 +5,10 @@ import { TranscriptView } from "@/components/TranscriptView";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/components/ui/toggle-group";
 import { Progress } from "@/components/ui/progress";
 import { Link as LinkIcon, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +20,15 @@ interface Sentence {
   timestamp: string;
   start: number;
   end: number;
+}
+
+interface ApiSentence {
+  text: string;
+  translation?: string;
+  timestamp?: string;
+  start: string | number;
+  end?: string | number;
+  duration?: string | number;
 }
 
 const SEGMENT_END_PADDING = 0.1;
@@ -43,6 +56,7 @@ const Index = () => {
   const [currentTab, setCurrentTab] = useState("dictation");
   const [sentences, setSentences] = useState<Sentence[]>([]);
   const [currentSentenceIndex, setCurrentSentenceIndex] = useState(0);
+  const [dictationMode, setDictationMode] = useState<number>(1);
   const [isLoading, setIsLoading] = useState(false);
   const [seekTo, setSeekTo] = useState<{ start: number; end: number } | null>(
     null
@@ -87,7 +101,7 @@ const Index = () => {
       }
 
       if (data.sentences && data.sentences.length > 0) {
-        const sentencesWithFallback = data.sentences.map((sentence: any) => {
+        const sentencesWithFallback = data.sentences.map((sentence: ApiSentence) => {
           const startTime = Number(sentence.start) || 0;
           const startTimeInSeconds = Math.max(startTime, 0);
           const timestamp =
@@ -114,11 +128,12 @@ const Index = () => {
           description: `Tìm thấy ${data.sentences.length} câu`,
         });
       }
-    } catch (error: any) {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       console.error("Error fetching captions:", error);
       toast({
         title: "Lỗi tải phụ đề",
-        description: error.message,
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -143,16 +158,16 @@ const Index = () => {
   };
 
   const handleNext = () => {
-    if (currentSentenceIndex < sentences.length - 1) {
-      const nextIndex = currentSentenceIndex + 1;
+    const nextIndex = currentSentenceIndex + dictationMode;
+    if (nextIndex < sentences.length) {
       setCurrentSentenceIndex(nextIndex);
       playCurrentSentence(nextIndex);
     }
   };
 
   const handlePrevious = () => {
-    if (currentSentenceIndex > 0) {
-      const prevIndex = currentSentenceIndex - 1;
+    const prevIndex = currentSentenceIndex - dictationMode;
+    if (prevIndex >= 0) {
       setCurrentSentenceIndex(prevIndex);
       playCurrentSentence(prevIndex);
     }
@@ -160,9 +175,14 @@ const Index = () => {
 
   const handleCheck = (userInput: string) => {
     if (userInput.trim()) {
-      setCompletedSentences((previouslyCompleted) =>
-        new Set(previouslyCompleted).add(currentSentenceIndex)
-      );
+      setCompletedSentences((previouslyCompleted) => {
+        const newCompleted = new Set(previouslyCompleted);
+        newCompleted.add(currentSentenceIndex);
+        if (dictationMode === 2 && currentSentenceIndex + 1 < sentences.length) {
+          newCompleted.add(currentSentenceIndex + 1);
+        }
+        return newCompleted;
+      });
     }
   };
 
@@ -174,17 +194,51 @@ const Index = () => {
 
   const playCurrentSentence = (index?: number) => {
     const sentenceIndex = index !== undefined ? index : currentSentenceIndex;
-    const sentence = sentences[sentenceIndex];
+    const sentence1 = sentences[sentenceIndex];
+    if (!sentence1) return;
 
-    if (sentence) {
-      setSeekTo(getSegmentBounds(sentence));
-    }
+    const sentence2 =
+      dictationMode === 2 && sentenceIndex + 1 < sentences.length
+        ? sentences[sentenceIndex + 1]
+        : null;
+
+    const segment = {
+      start: sentence1.start,
+      end: sentence2 ? sentence2.end : sentence1.end,
+    };
+
+    setSeekTo(segment);
   };
 
   const progressPercentage =
     sentences.length > 0
       ? (completedSentences.size / sentences.length) * 100
       : 0;
+
+  const currentSentenceData = sentences[currentSentenceIndex];
+  const nextSentenceData =
+    dictationMode === 2 && currentSentenceIndex + 1 < sentences.length
+      ? sentences[currentSentenceIndex + 1]
+      : null;
+
+  const dictationText =
+    currentSentenceData && nextSentenceData
+      ? `${currentSentenceData.text} ${nextSentenceData.text}`
+      : currentSentenceData?.text || "";
+
+  const dictationTranslation =
+    currentSentenceData && nextSentenceData
+      ? `${currentSentenceData.translation}\n${nextSentenceData.translation}`
+      : currentSentenceData?.translation || "";
+
+  const dictationSegment = currentSentenceData
+    ? {
+        start: currentSentenceData.start,
+        end: nextSentenceData
+          ? nextSentenceData.end
+          : currentSentenceData.end,
+      }
+    : null;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -194,7 +248,7 @@ const Index = () => {
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-4">
               <h1 className="text-2xl font-bold text-primary">
-                DailyDictation
+                VideoDictation
               </h1>
               <div className="flex-1 flex gap-2 max-w-2xl">
                 <Input
@@ -243,11 +297,7 @@ const Index = () => {
               videoUrl={videoUrl}
               seekTo={seekTo}
               onPlaybackComplete={() => setSeekTo(null)}
-              currentSegment={
-                sentences[currentSentenceIndex]
-                  ? getSegmentBounds(sentences[currentSentenceIndex])
-                  : null
-              }
+              currentSegment={dictationSegment}
             />
             {/* {sentences.length > 0 && (
               <div className="bg-card p-4 rounded-lg border border-border">
@@ -268,32 +318,56 @@ const Index = () => {
               onValueChange={setCurrentTab}
               className="flex-1 flex flex-col"
             >
-              <TabsList className="bg-card border border-border">
-                <TabsTrigger
-                  value="dictation"
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              <div className="flex items-center justify-between">
+                <TabsList className="bg-card border border-border">
+                  <TabsTrigger
+                    value="dictation"
+                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                  >
+                    Dictation
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="transcript"
+                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                  >
+                    Full Transcript
+                  </TabsTrigger>
+                </TabsList>
+                <ToggleGroup
+                  type="single"
+                  value={String(dictationMode)}
+                  onValueChange={(value) => {
+                    if (value) setDictationMode(Number(value));
+                  }}
+                  className="bg-card p-1 rounded-md border"
                 >
-                  Dictation
-                </TabsTrigger>
-                <TabsTrigger
-                  value="transcript"
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                >
-                  Full Transcript
-                </TabsTrigger>
-              </TabsList>
+                  <ToggleGroupItem
+                    value="1"
+                    className="px-3 py-1 text-sm data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                  >
+                    1 Sentence
+                  </ToggleGroupItem>
+                  <ToggleGroupItem
+                    value="2"
+                    className="px-3 py-1 text-sm data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                  >
+                    2 Sentences
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
 
               <TabsContent value="dictation" className="flex-1 mt-4">
                 {sentences.length > 0 ? (
                   <DictationPanel
-                    currentSentence={sentences[currentSentenceIndex].text}
+                    currentSentence={dictationText}
                     sentenceIndex={currentSentenceIndex}
                     totalSentences={sentences.length}
-                    translation={sentences[currentSentenceIndex].translation}
+                    translation={dictationTranslation}
                     onNext={handleNext}
                     onPrevious={handlePrevious}
                     onCheck={handleCheck}
                     onPlaySentence={() => playCurrentSentence()}
+                    dictationMode={dictationMode}
                   />
                 ) : (
                   <div className="flex items-center justify-center h-full">

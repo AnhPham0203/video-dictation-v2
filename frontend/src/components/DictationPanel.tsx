@@ -13,6 +13,7 @@ interface DictationPanelProps {
   onPrevious: () => void;
   onCheck: (userInput: string) => void;
   onPlaySentence: () => void;
+  dictationMode: number;
 }
 
 export const DictationPanel = ({
@@ -24,6 +25,7 @@ export const DictationPanel = ({
   onPrevious,
   onCheck,
   onPlaySentence,
+  dictationMode,
 }: DictationPanelProps) => {
   const [userInput, setUserInput] = useState("");
   const [feedback, setFeedback] = useState<{
@@ -62,7 +64,7 @@ export const DictationPanel = ({
     if (!word) return "";
     return word
       .toLowerCase()
-      .replace(/[.,!?;:'"()\[\]{}]/g, "")
+      .replace(/[.,!?;:'"()[\]{}]/g, "")
       .trim();
   };
 
@@ -193,7 +195,7 @@ export const DictationPanel = ({
           size="icon"
           variant="ghost"
           onClick={handlePreviousSentence}
-          disabled={sentenceIndex === 0}
+          disabled={sentenceIndex < dictationMode}
           className="hover:bg-secondary"
         >
           <ChevronLeft className="h-5 w-5" />
@@ -217,7 +219,7 @@ export const DictationPanel = ({
           size="icon"
           variant="ghost"
           onClick={handleNextSentence}
-          disabled={sentenceIndex === totalSentences - 1}
+          disabled={sentenceIndex >= totalSentences - dictationMode}
           className="hover:bg-secondary"
         >
           <ChevronRight className="h-5 w-5" />
