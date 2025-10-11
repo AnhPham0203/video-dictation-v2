@@ -10,7 +10,7 @@ import {
   ToggleGroupItem,
 } from "@/components/ui/toggle-group";
 import { Progress } from "@/components/ui/progress";
-import { Link as LinkIcon, Loader2 } from "lucide-react";
+import { Link as LinkIcon, Loader2, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -57,6 +57,7 @@ const Index = () => {
   const [sentences, setSentences] = useState<Sentence[]>([]);
   const [currentSentenceIndex, setCurrentSentenceIndex] = useState(0);
   const [dictationMode, setDictationMode] = useState<number>(1);
+  const [isVideoCovered, setIsVideoCovered] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [seekTo, setSeekTo] = useState<{ start: number; end: number } | null>(
     null
@@ -292,13 +293,20 @@ const Index = () => {
       <div className="container mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-140px)]">
           {/* Left: Video Player */}
-          <div className="flex flex-col gap-4">
+          <div className="relative flex flex-col gap-4">
             <VideoPlayer
               videoUrl={videoUrl}
               seekTo={seekTo}
               onPlaybackComplete={() => setSeekTo(null)}
               currentSegment={dictationSegment}
             />
+            <div
+              className={`absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center transition-opacity ${
+                isVideoCovered ? "opacity-100" : "opacity-0 pointer-events-none"
+              }`}
+            >
+              <p className="text-muted-foreground">Video is covered</p>
+            </div>
             {/* {sentences.length > 0 && (
               <div className="bg-card p-4 rounded-lg border border-border">
                 <h2 className="text-lg font-semibold mb-2">
@@ -319,20 +327,34 @@ const Index = () => {
               className="flex-1 flex flex-col"
             >
               <div className="flex items-center justify-between">
-                <TabsList className="bg-card border border-border">
-                  <TabsTrigger
-                    value="dictation"
-                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                <div className="flex items-center gap-2">
+                  <TabsList className="bg-card border border-border">
+                    <TabsTrigger
+                      value="dictation"
+                      className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                    >
+                      Dictation
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="transcript"
+                      className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                    >
+                      Full Transcript
+                    </TabsTrigger>
+                  </TabsList>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setIsVideoCovered(!isVideoCovered)}
+                    className="border"
                   >
-                    Dictation
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="transcript"
-                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                  >
-                    Full Transcript
-                  </TabsTrigger>
-                </TabsList>
+                    {isVideoCovered ? (
+                      <Eye className="h-4 w-4" />
+                    ) : (
+                      <EyeOff className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
                 <ToggleGroup
                   type="single"
                   value={String(dictationMode)}
