@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Play, RotateCcw, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
+import { PronunciationWord } from "./PronunciationWord";
 
 interface DictationPanelProps {
   currentSentence: string;
@@ -177,14 +178,16 @@ export const DictationPanel = ({
   };
 
   const getPronunciation = (text: string) => {
-    return text.split(" ").map((word, idx) => (
-      <span
-        key={idx}
-        className="inline-block mr-2 border-b-2 border-dotted border-pronunciation-dot"
-      >
-        {word}
-      </span>
-    ));
+    // Tách câu thành các từ, nhưng giữ lại khoảng trắng
+    const wordsAndSpaces = text.split(/(\s+)/);
+    return wordsAndSpaces.map((part, idx) => {
+      if (part.trim() === "") {
+        // Nếu là khoảng trắng, chỉ cần render nó
+        return <span key={idx}>{part}</span>;
+      }
+      // Nếu là một từ, render component PronunciationWord
+      return <PronunciationWord key={idx} word={part} />;
+    });
   };
 
   return (
