@@ -84,7 +84,7 @@ export const PronunciationWord = ({ word }: PronunciationWordProps) => {
   return (
     <Popover onOpenChange={(open) => open && !wordData && fetchWordData()}>
       <PopoverTrigger asChild>
-        <span className="inline-block mr-2 border-b-2 border-dotted border-gray-400 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 px-1 rounded">
+        <span className="inline-block mr-1 border-b-2 border-dotted border-gray-500 cursor-pointer hover:bg-white hover:text-black px-2 py-1 rounded-md transition-colors duration-200">
           {word}
         </span>
       </PopoverTrigger>

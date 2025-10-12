@@ -335,21 +335,23 @@ export const DictationPanel = ({
         </div>
 
         {/* Translation */}
-        <Card className="p-4 bg-secondary">
+        {/* <Card className="p-4 bg-secondary">
           <p className="text-sm text-muted-foreground mb-2">
             Vietnamese Translation:
           </p>
           <p className="text-foreground">{translation}</p>
           <p className="text-xs text-muted-foreground mt-2">Translated by AI</p>
-        </Card>
+        </Card> */}
 
         {/* Pronunciation Guide */}
-        <Card className="p-4 bg-secondary">
-          <p className="text-sm text-muted-foreground mb-2">Pronunciation:</p>
-          <div className="text-lg leading-relaxed">
-            {getPronunciation(currentSentence)}
-          </div>
-        </Card>
+        {awaitingConfirm && (
+          <Card className="p-4 bg-secondary">
+            <p className="text-sm text-muted-foreground mb-2">Pronunciation:</p>
+            <div className="text-lg leading-relaxed">
+              {getPronunciation(currentSentence)}
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   );
