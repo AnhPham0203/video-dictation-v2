@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { DictationPanel } from "@/components/DictationPanel";
 import { TranscriptView } from "@/components/TranscriptView";
+import { TypingPanel } from "@/components/TypingPanel";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -354,6 +355,12 @@ const Index = () => {
                     >
                       Full Transcript
                     </TabsTrigger>
+                    <TabsTrigger
+                      value="typing"
+                      className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                    >
+                      Typing
+                    </TabsTrigger>
                   </TabsList>
                   <Button
                     variant="outline"
@@ -419,6 +426,21 @@ const Index = () => {
                   currentIndex={currentSentenceIndex}
                   onSentenceClick={handleSentenceClick}
                 />
+              </TabsContent>
+
+              <TabsContent value="typing" className="flex-1 mt-4">
+                {sentences.length > 0 ? (
+                  <TypingPanel
+                    textToType={dictationText}
+                    onComplete={handleNext}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-muted-foreground">
+                      Load a YouTube video to start typing practice
+                    </p>
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
           </div>
