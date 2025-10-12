@@ -145,7 +145,7 @@ export const VideoPlayer = ({
         </div>
       )}
 
-      <div className="absolute bottom-4 left-4 flex gap-2">
+      {/* <div className="absolute bottom-4 left-4 flex gap-2">
         <Button
           size="icon"
           variant="secondary"
@@ -158,7 +158,7 @@ export const VideoPlayer = ({
             <Play className="h-4 w-4" />
           )}
         </Button>
-      </div>
+      </div> */}
     </div>
   );
 };

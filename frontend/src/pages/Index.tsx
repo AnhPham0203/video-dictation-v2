@@ -31,7 +31,7 @@ interface ApiSentence {
   duration?: string | number;
 }
 
-const SEGMENT_END_PADDING = 0.1;
+const SEGMENT_END_PADDING = 0.5; // Tăng khoảng đệm để ngắt sớm hơn
 
 const getSegmentBounds = (sentence: Sentence) => {
   const adjustedEnd = Math.max(
@@ -102,26 +102,37 @@ const Index = () => {
       }
 
       if (data.sentences && data.sentences.length > 0) {
-        const sentencesWithFallback = data.sentences.map((sentence: ApiSentence) => {
+        const processedSentences = data.sentences.map((sentence: ApiSentence, index: number) => {
           const startTime = Number(sentence.start) || 0;
           const startTimeInSeconds = Math.max(startTime, 0);
           const timestamp =
             sentence.timestamp ||
             new Date(startTimeInSeconds * 1000).toISOString().substring(11, 19);
 
+          let endTimeInSeconds;
+          const nextSentence = data.sentences[index + 1];
+
+          if (nextSentence) {
+            // Lấy thời gian bắt đầu của câu tiếp theo làm thời gian kết thúc
+            endTimeInSeconds = Number(nextSentence.start);
+          } else {
+            // Đối với câu cuối cùng, sử dụng logic cũ hoặc cộng thêm một khoảng thời gian dài hơn
+            endTimeInSeconds =
+              Number(sentence.end) ||
+              startTimeInSeconds + Number(sentence.duration) ||
+              startTimeInSeconds + 5; // Tăng lên 5 giây cho chắc chắn
+          }
+
           return {
             text: sentence.text,
             translation: sentence.translation || "Chưa có bản dịch",
             timestamp,
             start: startTimeInSeconds,
-            end:
-              Number(sentence.end) ||
-              startTimeInSeconds + Number(sentence.duration) ||
-              startTimeInSeconds + 3,
+            end: endTimeInSeconds,
           };
         });
 
-        setSentences(sentencesWithFallback);
+        setSentences(processedSentences);
         setCurrentSentenceIndex(0);
         setCompletedSentences(new Set());
         toast({
@@ -203,9 +214,11 @@ const Index = () => {
         ? sentences[sentenceIndex + 1]
         : null;
 
+    const segmentEnd = sentence2 ? sentence2.end : sentence1.end;
+    
     const segment = {
       start: sentence1.start,
-      end: sentence2 ? sentence2.end : sentence1.end,
+      end: Math.max(sentence1.start, segmentEnd - SEGMENT_END_PADDING),
     };
 
     setSeekTo(segment);

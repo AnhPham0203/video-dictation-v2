@@ -36,9 +36,13 @@ def _with_timestamp(sentence: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def fetch_youtube_captions(video_id: str):
+    ENGLISH_LANGS = [
+    'en', 'en-GB', 'en-US', 'en-AU', 'en-CA',
+    'en-IN', 'en-NZ', 'en-IE', 'en-ZA','vi'
+]
     try:
         api = YouTubeTranscriptApi()
-        transcript = api.fetch(video_id, languages=['en', 'vi'])
+        transcript = api.fetch(video_id, languages=ENGLISH_LANGS)
         normalized = [_to_dict(segment) for segment in transcript]
         return [_with_timestamp(segment) for segment in normalized]
     except Exception as e:
