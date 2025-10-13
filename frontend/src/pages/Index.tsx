@@ -172,6 +172,13 @@ const Index = () => {
 
   const handleNext = () => {
     const nextIndex = currentSentenceIndex + dictationMode;
+
+    if (dictationMode === 2 && nextIndex >= sentences.length) {
+      setCurrentSentenceIndex(sentences.length - 1);
+      playCurrentSentence(sentences.length - 1);
+      return;
+    }
+
     if (nextIndex < sentences.length) {
       setCurrentSentenceIndex(nextIndex);
       playCurrentSentence(nextIndex);

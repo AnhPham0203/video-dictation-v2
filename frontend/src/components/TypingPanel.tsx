@@ -1,4 +1,10 @@
-import React, { useState, useRef, useEffect, useLayoutEffect, useMemo } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+} from "react";
 
 const CARET_HEIGHT = 30;
 const CARET_TOP_OFFSET = 5;
@@ -33,6 +39,12 @@ const sanitizeSpecialSymbols = (value: string) => {
   );
 };
 
+const normalizeForComparison = (value: string) =>
+  sanitizeSpecialSymbols(value)
+    .replace(/\r?\n/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
 export const TypingPanel = ({ textToType, onComplete }: TypingPanelProps) => {
   const [typed, setTyped] = useState("");
   const [caretPos, setCaretPos] = useState(0);
@@ -53,10 +65,13 @@ export const TypingPanel = ({ textToType, onComplete }: TypingPanelProps) => {
     [textToType]
   );
   const normalizedTarget = useMemo(
-    () => sanitizedTarget.replace(/\r?\n/g, ""),
-    [sanitizedTarget]
+    () => normalizeForComparison(textToType),
+    [textToType]
   );
-  const normalizedTyped = useMemo(() => typed.replace(/\r?\n/g, ""), [typed]);
+  const normalizedTyped = useMemo(
+    () => normalizeForComparison(typed),
+    [typed]
+  );
   const characters = useMemo(
     () => sanitizedTarget.split(""),
     [sanitizedTarget]
@@ -153,11 +168,13 @@ export const TypingPanel = ({ textToType, onComplete }: TypingPanelProps) => {
   }, [caretPos, characters, sanitizedTarget]);
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = event.target.value;
-    if (newValue.length > sanitizedTarget.length) return;
+    const rawValue = event.target.value;
+    const sanitizedNewValue = sanitizeSpecialSymbols(rawValue);
 
-    setTyped(newValue);
-    setCaretPos(newValue.length);
+    if (sanitizedNewValue.length > sanitizedTarget.length) return;
+
+    setTyped(sanitizedNewValue);
+    setCaretPos(sanitizedNewValue.length);
   };
 
   useEffect(() => {
