@@ -60,3 +60,18 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes typing-caret-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.typing-panel-caret {
+  animation: typing-caret-blink 1s steps(1, end) infinite;
+  box-shadow: 0 0 8px rgba(217, 119, 6, 0.65);
+}

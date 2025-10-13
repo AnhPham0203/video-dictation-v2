@@ -1,83 +1,242 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useMemo } from "react";
+
+const CARET_HEIGHT = 30;
+const CARET_TOP_OFFSET = 5;
 
 interface TypingPanelProps {
   textToType: string;
   onComplete: () => void;
 }
 
-export const TypingPanel: React.FC<TypingPanelProps> = ({ textToType, onComplete }) => {
-  const [typed, setTyped] = useState<string>('');
-  const [cursorIndex, setCursorIndex] = useState<number>(0);
+const sanitizeSpecialSymbols = (value: string) => {
+  if (!value) return "";
+
+  const replacements: Array<[RegExp, string]> = [
+    [/\u2018|\u2019|\u201A|\u201B|\u2032|\u2035/g, "'"],
+    [/\u201C|\u201D|\u201E|\u201F|\u2033|\u2036/g, '"'],
+    [/\u2010|\u2011|\u2012|\u2013|\u2014|\u2015|\u2212/g, "-"],
+    [/\u2026/g, "..."],
+    [/\u2022|\u2023|\u2043|\u2219|\u00B7/g, "-"],
+    [/\u2044/g, "/"],
+    [/\u02C6/g, "^"],
+    [/\u02DC/g, "~"],
+    [/\u00B0/g, "deg"],
+    [/\u00A9/g, "(c)"],
+    [/\u00AE/g, "(r)"],
+    [/\u2122/g, "TM"],
+    [/\u00A0|[\u2000-\u200B]|\u202F|\u205F|\u3000/g, " "],
+  ];
+
+  return replacements.reduce(
+    (text, [pattern, replacement]) => text.replace(pattern, replacement),
+    value
+  );
+};
+
+export const TypingPanel = ({ textToType, onComplete }: TypingPanelProps) => {
+  const [typed, setTyped] = useState("");
+  const [caretPos, setCaretPos] = useState(0);
+  const [showCompletionHint, setShowCompletionHint] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const caretRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // Reset state when a new sentence is provided
-    setTyped('');
-    setCursorIndex(0);
+    setTyped("");
+    setCaretPos(0);
+    setShowCompletionHint(false);
     inputRef.current?.focus();
   }, [textToType]);
 
-  useEffect(() => {
-    // Focus the hidden input when the component mounts or the tab becomes active
-    inputRef.current?.focus();
-  }, []);
+  const sanitizedTarget = useMemo(
+    () => sanitizeSpecialSymbols(textToType),
+    [textToType]
+  );
+  const normalizedTarget = useMemo(
+    () => sanitizedTarget.replace(/\r?\n/g, ""),
+    [sanitizedTarget]
+  );
+  const normalizedTyped = useMemo(() => typed.replace(/\r?\n/g, ""), [typed]);
+  const characters = useMemo(
+    () => sanitizedTarget.split(""),
+    [sanitizedTarget]
+  );
+  const hasCompleted =
+    normalizedTarget.length > 0 &&
+    normalizedTyped.length === normalizedTarget.length &&
+    normalizedTyped === normalizedTarget;
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    const { key } = e;
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const caret = caretRef.current;
+    if (!container || !caret) return;
 
-    if (key === 'Backspace') {
-      setTyped((prev) => prev.slice(0, -1));
-      setCursorIndex((prev) => Math.max(0, prev - 1));
-    } else if (key.length === 1) { // Handle printable characters
-      if (cursorIndex < textToType.length) {
-        setTyped((prev) => prev + key);
-        setCursorIndex((prev) => prev + 1);
+    const computed = window.getComputedStyle(container);
+    const fallbackLineHeight =
+      parseFloat(computed.lineHeight) ||
+      parseFloat(computed.fontSize) * 1.1 ||
+      24;
+    const containerRect = container.getBoundingClientRect();
+
+    if (characters.length === 0) {
+      caret.style.left = "0px";
+      caret.style.top = `${CARET_TOP_OFFSET}px`;
+      caret.style.height = `${CARET_HEIGHT}px`;
+      return;
+    }
+
+    const getRectForIndex = (index: number): DOMRect | null => {
+      if (index < 0 || index >= characters.length) return null;
+      const element = container.querySelector<HTMLElement>(
+        `[data-char-index="${index}"]`
+      );
+      return element ? element.getBoundingClientRect() : null;
+    };
+
+    const clamp = (value: number, min: number, max: number) => {
+      if (max < min) return min;
+      return Math.min(Math.max(value, min), max);
+    };
+
+    const applyCaret = (rect: DOMRect, alignRight = false) => {
+      const left = alignRight ? rect.right : rect.left;
+      caret.style.left = `${left - containerRect.left}px`;
+      caret.style.top = `${rect.top - containerRect.top + CARET_TOP_OFFSET}px`;
+      caret.style.height = `${CARET_HEIGHT}px`;
+    };
+
+    const targetIndex = clamp(caretPos, 0, characters.length);
+
+    // Position before the character we still need to type
+    if (targetIndex < characters.length && characters[targetIndex] !== "\n") {
+      const targetRect = getRectForIndex(targetIndex);
+      if (targetRect) {
+        applyCaret(targetRect);
+        return;
       }
     }
 
-    // Check for completion
-    if (cursorIndex + 1 === textToType.length && key === textToType[cursorIndex]) {
-      setTimeout(() => {
-        onComplete();
-      }, 300); // Delay before moving to the next sentence
+    // Handle newline: seek the next printable character on the new line
+    if (targetIndex < characters.length && characters[targetIndex] === "\n") {
+      for (let i = targetIndex + 1; i < characters.length; i++) {
+        if (characters[i] !== "\n") {
+          const nextRect = getRectForIndex(i);
+          if (nextRect) {
+            applyCaret(nextRect);
+            return;
+          }
+        }
+      }
     }
+
+    // Otherwise, align to the end of the previous character
+    const previousIndex = clamp(targetIndex - 1, 0, characters.length - 1);
+    const previousRect = getRectForIndex(previousIndex);
+    if (previousRect) {
+      if (characters[previousIndex] === "\n") {
+        const prevPrintableRect = getRectForIndex(previousIndex - 1);
+        const topBase = prevPrintableRect
+          ? prevPrintableRect.bottom - containerRect.top
+          : previousRect.top - containerRect.top + fallbackLineHeight;
+        caret.style.left = "0px";
+        caret.style.top = `${topBase + CARET_TOP_OFFSET}px`;
+        caret.style.height = `${CARET_HEIGHT}px`;
+        return;
+      }
+      applyCaret(previousRect, true);
+      return;
+    }
+
+    caret.style.left = "0px";
+    caret.style.top = `${CARET_TOP_OFFSET}px`;
+    caret.style.height = `${CARET_HEIGHT}px`;
+  }, [caretPos, characters, sanitizedTarget]);
+
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = event.target.value;
+    if (newValue.length > sanitizedTarget.length) return;
+
+    setTyped(newValue);
+    setCaretPos(newValue.length);
   };
 
-  const characters = textToType.split('').map((char, index) => {
-    let className = 'text-gray-500'; // Untyped characters
-    if (index < typed.length) {
-      className = typed[index] === char ? 'text-white' : 'text-red-500 bg-red-900/50 rounded'; // Correct vs Incorrect
+  useEffect(() => {
+    setShowCompletionHint(hasCompleted);
+  }, [hasCompleted]);
+
+  useEffect(() => {
+    if (!hasCompleted) {
+      return;
     }
 
-    // Caret styling
-    const isCaret = index === cursorIndex;
-    const caretClass = isCaret ? 'relative caret' : '';
+    const handleEnter = (event: KeyboardEvent) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        setShowCompletionHint(false);
+        onComplete();
+      }
+    };
 
-    return (
-      <span key={index} className={`${className} ${caretClass}`}>
-        {isCaret && <span className="absolute left-0 top-0 h-full w-0.5 bg-yellow-400 animate-pulse" />}
-        {char}
-      </span>
-    );
-  });
+    window.addEventListener("keydown", handleEnter, true);
+
+    return () => {
+      window.removeEventListener("keydown", handleEnter, true);
+    };
+  }, [hasCompleted, onComplete]);
 
   return (
-    <div 
-      className="p-6 bg-gray-800 rounded-lg font-mono text-2xl leading-loose relative focus:outline-none" 
-      tabIndex={0}
+    <div
+      className="relative p-6 bg-gray-800 rounded-lg font-mono text-2xl leading-relaxed text-left"
       onClick={() => inputRef.current?.focus()}
     >
       <input
         ref={inputRef}
-        type="text"
-        className="absolute inset-0 opacity-0 cursor-default"
-        onKeyDown={handleKeyDown}
+        value={typed}
+        onChange={handleChange}
+        className="absolute inset-0 opacity-0"
         autoFocus
       />
-      <div className="whitespace-pre-wrap select-none">
-        {characters}
+      <div
+        ref={containerRef}
+        className="relative whitespace-pre-wrap select-none"
+      >
+        {characters.map((char, index) => {
+          const typedChar = typed[index];
+          const isTyped = index < typed.length;
+          const isCorrect = typedChar === char;
+          const baseCharClass =
+            char === "\n" ? "block w-full h-0" : "inline-block";
+          const displayChar =
+            char === " " ? "\u00A0" : char === "\n" ? "\u200B" : char;
+
+          return (
+            <span
+              key={index}
+              data-char-index={index}
+              className={`char ${baseCharClass} ${
+                isTyped
+                  ? isCorrect
+                    ? "text-white"
+                    : "text-red-400"
+                  : "text-gray-500"
+              }`}
+            >
+              {displayChar}
+            </span>
+          );
+        })}
+
+        <div
+          ref={caretRef}
+          className="typing-panel-caret absolute w-[3px] rounded bg-amber-400 transition-all duration-75"
+          style={{ left: 0, top: CARET_TOP_OFFSET, height: CARET_HEIGHT }}
+        />
       </div>
+      {showCompletionHint && (
+        <p className="mt-3 text-base text-amber-300 font-medium">
+          Perfect! Press Enter to jump to the next sentence.
+        </p>
+      )}
     </div>
   );
 };

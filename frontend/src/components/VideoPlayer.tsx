@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useRef, useEffect, useState, useCallback } from "react";
 import { Play, Pause } from "lucide-react";
 import { Button } from "@/components/ui/button";
