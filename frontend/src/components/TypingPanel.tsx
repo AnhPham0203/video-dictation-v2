@@ -4,7 +4,9 @@ import React, {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useCallback,
 } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const CARET_HEIGHT = 30;
 const CARET_TOP_OFFSET = 5;
@@ -12,6 +14,10 @@ const CARET_TOP_OFFSET = 5;
 interface TypingPanelProps {
   textToType: string;
   onComplete: () => void;
+  onNext?: () => void;
+  onPrevious?: () => void;
+  sentenceIndex?: number;
+  totalSentences?: number;
 }
 
 const sanitizeSpecialSymbols = (value: string) => {
@@ -45,7 +51,14 @@ const normalizeForComparison = (value: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
-export const TypingPanel = ({ textToType, onComplete }: TypingPanelProps) => {
+export const TypingPanel = ({
+  textToType,
+  onComplete,
+  onNext,
+  onPrevious,
+  sentenceIndex,
+  totalSentences,
+}: TypingPanelProps) => {
   const [typed, setTyped] = useState("");
   const [caretPos, setCaretPos] = useState(0);
   const [showCompletionHint, setShowCompletionHint] = useState(false);
@@ -72,6 +85,10 @@ export const TypingPanel = ({ textToType, onComplete }: TypingPanelProps) => {
     () => normalizeForComparison(typed),
     [typed]
   );
+  const progressLabel =
+    typeof sentenceIndex === "number" && typeof totalSentences === "number"
+      ? `${Math.min(sentenceIndex + 1, totalSentences)} / ${totalSentences}`
+      : null;
   const characters = useMemo(
     () => sanitizedTarget.split(""),
     [sanitizedTarget]
@@ -177,6 +194,24 @@ export const TypingPanel = ({ textToType, onComplete }: TypingPanelProps) => {
     setCaretPos(sanitizedNewValue.length);
   };
 
+  const handlePreviousClick = useCallback(() => {
+    if (!onPrevious) return;
+    setTyped("");
+    setCaretPos(0);
+    setShowCompletionHint(false);
+    onPrevious();
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, [onPrevious]);
+
+  const handleNextClick = useCallback(() => {
+    if (!onNext) return;
+    setTyped("");
+    setCaretPos(0);
+    setShowCompletionHint(false);
+    onNext();
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, [onNext]);
+
   useEffect(() => {
     setShowCompletionHint(hasCompleted);
   }, [hasCompleted]);
@@ -253,6 +288,27 @@ export const TypingPanel = ({ textToType, onComplete }: TypingPanelProps) => {
         <p className="mt-3 text-base text-amber-300 font-medium">
           Perfect! Press Enter to jump to the next sentence.
         </p>
+      )}
+      {(onPrevious || onNext || progressLabel) && (
+        <div className="absolute -bottom-14 left-1/2 flex -translate-x-1/2 items-center gap-4 text-base text-muted-foreground">
+          <button
+            type="button"
+            onClick={handlePreviousClick}
+            disabled={!onPrevious}
+            className="rounded-full border border-border px-3 py-1 transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            &lt;
+          </button>
+          {progressLabel && <span>{progressLabel}</span>}
+          <button
+            type="button"
+            onClick={handleNextClick}
+            disabled={!onNext}
+            className="rounded-full border border-border px-3 py-1 transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            &gt;
+          </button>
+        </div>
       )}
     </div>
   );

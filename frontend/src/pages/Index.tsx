@@ -6,10 +6,7 @@ import { TypingPanel } from "@/components/TypingPanel";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui/toggle-group";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Progress } from "@/components/ui/progress";
 import { Link as LinkIcon, Loader2, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -103,35 +100,39 @@ const Index = () => {
       }
 
       if (data.sentences && data.sentences.length > 0) {
-        const processedSentences = data.sentences.map((sentence: ApiSentence, index: number) => {
-          const startTime = Number(sentence.start) || 0;
-          const startTimeInSeconds = Math.max(startTime, 0);
-          const timestamp =
-            sentence.timestamp ||
-            new Date(startTimeInSeconds * 1000).toISOString().substring(11, 19);
+        const processedSentences = data.sentences.map(
+          (sentence: ApiSentence, index: number) => {
+            const startTime = Number(sentence.start) || 0;
+            const startTimeInSeconds = Math.max(startTime, 0);
+            const timestamp =
+              sentence.timestamp ||
+              new Date(startTimeInSeconds * 1000)
+                .toISOString()
+                .substring(11, 19);
 
-          let endTimeInSeconds;
-          const nextSentence = data.sentences[index + 1];
+            let endTimeInSeconds;
+            const nextSentence = data.sentences[index + 1];
 
-          if (nextSentence) {
-            // Lấy thời gian bắt đầu của câu tiếp theo làm thời gian kết thúc
-            endTimeInSeconds = Number(nextSentence.start);
-          } else {
-            // Đối với câu cuối cùng, sử dụng logic cũ hoặc cộng thêm một khoảng thời gian dài hơn
-            endTimeInSeconds =
-              Number(sentence.end) ||
-              startTimeInSeconds + Number(sentence.duration) ||
-              startTimeInSeconds + 5; // Tăng lên 5 giây cho chắc chắn
+            if (nextSentence) {
+              // Lấy thời gian bắt đầu của câu tiếp theo làm thời gian kết thúc
+              endTimeInSeconds = Number(nextSentence.start);
+            } else {
+              // Đối với câu cuối cùng, sử dụng logic cũ hoặc cộng thêm một khoảng thời gian dài hơn
+              endTimeInSeconds =
+                Number(sentence.end) ||
+                startTimeInSeconds + Number(sentence.duration) ||
+                startTimeInSeconds + 5; // Tăng lên 5 giây cho chắc chắn
+            }
+
+            return {
+              text: sentence.text,
+              translation: sentence.translation || "Chưa có bản dịch",
+              timestamp,
+              start: startTimeInSeconds,
+              end: endTimeInSeconds,
+            };
           }
-
-          return {
-            text: sentence.text,
-            translation: sentence.translation || "Chưa có bản dịch",
-            timestamp,
-            start: startTimeInSeconds,
-            end: endTimeInSeconds,
-          };
-        });
+        );
 
         setSentences(processedSentences);
         setCurrentSentenceIndex(0);
@@ -198,7 +199,10 @@ const Index = () => {
       setCompletedSentences((previouslyCompleted) => {
         const newCompleted = new Set(previouslyCompleted);
         newCompleted.add(currentSentenceIndex);
-        if (dictationMode === 2 && currentSentenceIndex + 1 < sentences.length) {
+        if (
+          dictationMode === 2 &&
+          currentSentenceIndex + 1 < sentences.length
+        ) {
           newCompleted.add(currentSentenceIndex + 1);
         }
         return newCompleted;
@@ -223,7 +227,7 @@ const Index = () => {
         : null;
 
     const segmentEnd = sentence2 ? sentence2.end : sentence1.end;
-    
+
     const segment = {
       start: sentence1.start,
       end: Math.max(sentence1.start, segmentEnd - SEGMENT_END_PADDING),
@@ -256,9 +260,7 @@ const Index = () => {
   const dictationSegment = currentSentenceData
     ? {
         start: currentSentenceData.start,
-        end: nextSentenceData
-          ? nextSentenceData.end
-          : currentSentenceData.end,
+        end: nextSentenceData ? nextSentenceData.end : currentSentenceData.end,
       }
     : null;
 
@@ -357,16 +359,16 @@ const Index = () => {
                       Dictation
                     </TabsTrigger>
                     <TabsTrigger
-                      value="transcript"
-                      className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                    >
-                      Full Transcript
-                    </TabsTrigger>
-                    <TabsTrigger
                       value="typing"
                       className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                     >
                       Typing
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="transcript"
+                      className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                    >
+                      Full Transcript
                     </TabsTrigger>
                   </TabsList>
                   <Button
@@ -440,6 +442,10 @@ const Index = () => {
                   <TypingPanel
                     textToType={dictationText}
                     onComplete={handleNext}
+                    onNext={handleNext}
+                    onPrevious={handlePrevious}
+                    sentenceIndex={currentSentenceIndex}
+                    totalSentences={sentences.length}
                   />
                 ) : (
                   <div className="flex items-center justify-center h-full">
