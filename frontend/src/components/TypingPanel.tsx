@@ -37,6 +37,8 @@ const sanitizeSpecialSymbols = (value: string) => {
     [/\u00AE/g, "(r)"],
     [/\u2122/g, "TM"],
     [/\u00A0|[\u2000-\u200B]|\u202F|\u205F|\u3000/g, " "],
+    [/[\u200C-\u200D]|\uFEFF/g, ""],
+    [/♪/g, ""],
   ];
 
   return replacements.reduce(
@@ -250,16 +252,18 @@ export const TypingPanel = ({
       />
       <div
         ref={containerRef}
-        className="relative whitespace-pre-wrap select-none"
+        className="relative whitespace-pre-wrap break-words select-none"
       >
         {characters.map((char, index) => {
           const typedChar = typed[index];
           const isTyped = index < typed.length;
           const isCorrect = typedChar === char;
           const baseCharClass =
-            char === "\n" ? "block w-full h-0" : "inline-block";
+            char === "\n"
+              ? "block w-full h-0"
+              : "inline";
           const displayChar =
-            char === " " ? "\u00A0" : char === "\n" ? "\u200B" : char;
+            char === " " ? " " : char === "\n" ? "\u200B" : char;
 
           return (
             <span

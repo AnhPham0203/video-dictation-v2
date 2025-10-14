@@ -54,18 +54,38 @@ export const DictationPanel = ({
     }
   }, [currentSentence]);
 
-  const sanitizeSpecialSymbols = (value: string) =>
-    value
-      .replace(/♪/g, "")
-      .replace(/[’‘]/g, "'")
-      .replace(/[“”]/g, '"')
-      .replace(/…/g, "");
+  const sanitizeSpecialSymbols = (value: string) => {
+    if (!value) return "";
+
+    const replacements: Array<[RegExp, string]> = [
+      [/\u2018|\u2019|\u201A|\u201B|\u2032|\u2035/g, "'"],
+      [/\u201C|\u201D|\u201E|\u201F|\u2033|\u2036/g, '"'],
+      [/\u2010|\u2011|\u2012|\u2013|\u2014|\u2015|\u2212/g, "-"],
+      [/\u2026/g, "..."],
+      [/\u2022|\u2023|\u2043|\u2219|\u00B7/g, "-"],
+      [/\u2044/g, "/"],
+      [/\u02C6/g, "^"],
+      [/\u02DC/g, "~"],
+      [/\u00B0/g, "deg"],
+      [/\u00A9/g, "(c)"],
+      [/\u00AE/g, "(r)"],
+      [/\u2122/g, "TM"],
+      [/\u00A0|[\u2000-\u200B]|\u202F|\u205F|\u3000/g, " "],
+      [/[\u200C-\u200D]|\uFEFF/g, ""],
+      [/♪/g, ""],
+    ];
+
+    return replacements.reduce(
+      (text, [pattern, replacement]) => text.replace(pattern, replacement),
+      value
+    );
+  };
 
   const normalizeWord = (word: string | null | undefined) => {
     if (!word) return "";
-    return word
+    return sanitizeSpecialSymbols(word)
       .toLowerCase()
-      .replace(/[.,!?;:'"()[\]{}]/g, "")
+      .replace(/[-.,!?;:'"()[\]{}]/g, "")
       .trim();
   };
 
@@ -305,9 +325,7 @@ export const DictationPanel = ({
                   className="rounded bg-yellow-100 px-2 py-1 text-yellow-800"
                 >
                   {extra.masked}
-                  <span className="ml-1 italic text-yellow-700">
-                    (thừa)
-                  </span>
+                  <span className="ml-1 italic text-yellow-700">(thừa)</span>
                 </span>
               ))}
             </div>
