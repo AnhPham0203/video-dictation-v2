@@ -359,11 +359,11 @@ const Index = () => {
           </div>
 
           {/* Right: Dictation/Transcript Panel */}
-          <div className="flex flex-col">
+          <div className="flex flex-col h-full min-h-0">
             <Tabs
               value={currentTab}
               onValueChange={setCurrentTab}
-              className="flex-1 flex flex-col"
+              className="flex-1 flex flex-col overflow-hidden"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -447,7 +447,10 @@ const Index = () => {
                 )}
               </TabsContent>
 
-              <TabsContent value="transcript" className="flex-1 mt-4">
+              <TabsContent
+                value="transcript"
+                className="flex-1 mt-4 overflow-hidden min-h-0"
+              >
                 <TranscriptView
                   sentences={sentences}
                   currentIndex={currentSentenceIndex}
