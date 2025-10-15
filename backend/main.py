@@ -1,8 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from utils.youtube_service import fetch_youtube_captions
 import uvicorn
-
+from backend.utils.youtube_service import fetch_youtube_captions
 app = FastAPI()
 
 # Allow the frontend to call this API from any origin

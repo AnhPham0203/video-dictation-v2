@@ -72,13 +72,15 @@ Dự án được chia thành hai phần chính:
     ```
 3.  Cài đặt các gói phụ thuộc (cần tạo tệp `requirements.txt` trước):
     ```bash
-    pip install fastapi uvicorn youtube_transcript_api
+    pip install -r requirements.txt
     ```
 4.  Chạy máy chủ:
     ```bash
     uvicorn main:app --reload --port 5000
     ```
     API sẽ có sẵn tại `http://localhost:5000`.
+
+> 💡 **Triển khai trên Render:** Xem tài liệu `backend/RENDER_DEPLOYMENT.md` và file cấu hình `render.yaml` để thiết lập dịch vụ FastAPI trên Render thông qua Blueprint.
 
 ## 5. Kiến Trúc Chi Tiết
 
