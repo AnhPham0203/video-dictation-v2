@@ -4,6 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { PronunciationWord } from "./PronunciationWord";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface DictationPanelProps {
   currentSentence: string;
@@ -15,6 +22,8 @@ interface DictationPanelProps {
   onCheck: (userInput: string) => void;
   onPlaySentence: () => void;
   dictationMode: number;
+  repeatCount: number;
+  onRepeatCountChange: (value: number) => void;
 }
 
 export const DictationPanel = ({
@@ -27,6 +36,8 @@ export const DictationPanel = ({
   onCheck,
   onPlaySentence,
   dictationMode,
+  repeatCount,
+  onRepeatCountChange,
 }: DictationPanelProps) => {
   const [userInput, setUserInput] = useState("");
   const [feedback, setFeedback] = useState<{
@@ -233,6 +244,26 @@ export const DictationPanel = ({
           >
             <Play className="h-4 w-4" />
           </Button>
+          <div className="flex items-center gap-2">
+            <span className="text-xs uppercase tracking-wide text-muted-foreground">
+              Repeat
+            </span>
+            <Select
+              value={String(repeatCount)}
+              onValueChange={(value) => onRepeatCountChange(Number(value))}
+            >
+              <SelectTrigger className="h-9 w-[88px]">
+                <SelectValue placeholder="Repeat" />
+              </SelectTrigger>
+              <SelectContent>
+                {[1, 2, 3, 4, 5].map((option) => (
+                  <SelectItem key={option} value={String(option)}>
+                    {option}x
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <span className="text-sm font-medium text-muted-foreground">
             {sentenceIndex + 1} / {totalSentences}
           </span>

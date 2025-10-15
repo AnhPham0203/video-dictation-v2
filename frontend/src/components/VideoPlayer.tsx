@@ -9,6 +9,7 @@ interface VideoPlayerProps {
   seekTo?: { start: number; end: number } | null;
   onPlaybackComplete?: () => void;
   currentSegment?: { start: number; end: number } | null;
+  onReplayRequest?: () => void;
 }
 
 export const VideoPlayer = ({
@@ -17,6 +18,7 @@ export const VideoPlayer = ({
   seekTo,
   onPlaybackComplete,
   currentSegment,
+  onReplayRequest,
 }: VideoPlayerProps) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -65,7 +67,11 @@ export const VideoPlayer = ({
 
       if (event.key === "Control") {
         event.preventDefault();
-        playSegment(currentSegment);
+        if (onReplayRequest) {
+          onReplayRequest();
+        } else {
+          playSegment(currentSegment);
+        }
       }
     };
 
@@ -74,7 +80,7 @@ export const VideoPlayer = ({
     return () => {
       window.removeEventListener("keydown", handleCtrlReplay);
     };
-  }, [currentSegment, playSegment]);
+  }, [currentSegment, onReplayRequest, playSegment]);
 
   // Load YouTube IFrame API
   useEffect(() => {

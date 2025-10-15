@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { DictationPanel } from "@/components/DictationPanel";
 import { TranscriptView } from "@/components/TranscriptView";
@@ -60,6 +60,9 @@ const Index = () => {
   const [seekTo, setSeekTo] = useState<{ start: number; end: number } | null>(
     null
   );
+  const [repeatCount, setRepeatCount] = useState(3);
+  const [remainingRepeats, setRemainingRepeats] = useState(0);
+  const lastSegmentRef = useRef<{ start: number; end: number } | null>(null);
   const [completedSentences, setCompletedSentences] = useState<Set<number>>(
     new Set()
   );
@@ -233,8 +236,20 @@ const Index = () => {
       end: Math.max(sentence1.start, segmentEnd - SEGMENT_END_PADDING),
     };
 
+    lastSegmentRef.current = segment;
+    setRemainingRepeats(Math.max(repeatCount - 1, 0));
     setSeekTo(segment);
   };
+
+  const handlePlaybackComplete = useCallback(() => {
+    if (remainingRepeats > 0 && lastSegmentRef.current) {
+      setRemainingRepeats((prev) => Math.max(prev - 1, 0));
+      setSeekTo({ ...lastSegmentRef.current });
+    } else {
+      setSeekTo(null);
+      setRemainingRepeats(0);
+    }
+  }, [remainingRepeats]);
 
   const progressPercentage =
     sentences.length > 0
@@ -320,8 +335,9 @@ const Index = () => {
             <VideoPlayer
               videoUrl={videoUrl}
               seekTo={seekTo}
-              onPlaybackComplete={() => setSeekTo(null)}
+              onPlaybackComplete={handlePlaybackComplete}
               currentSegment={dictationSegment}
+              onReplayRequest={() => playCurrentSentence()}
             />
             <div
               className={`absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center transition-opacity ${
@@ -419,6 +435,8 @@ const Index = () => {
                     onCheck={handleCheck}
                     onPlaySentence={() => playCurrentSentence()}
                     dictationMode={dictationMode}
+                    repeatCount={repeatCount}
+                    onRepeatCountChange={(value) => setRepeatCount(Math.max(1, value))}
                   />
                 ) : (
                   <div className="flex items-center justify-center h-full">
