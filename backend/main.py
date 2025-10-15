@@ -5,7 +5,7 @@ import uvicorn
 
 app = FastAPI()
 
-# Cho phép frontend gọi
+# Allow the frontend to call this API from any origin
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
