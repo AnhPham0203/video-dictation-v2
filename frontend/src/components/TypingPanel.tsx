@@ -28,6 +28,7 @@ const sanitizeSpecialSymbols = (value: string) => {
     [/\u201C|\u201D|\u201E|\u201F|\u2033|\u2036/g, '"'],
     [/\u2010|\u2011|\u2012|\u2013|\u2014|\u2015|\u2212/g, "-"],
     [/\u2026/g, "..."],
+    [/\r?\n/g, " "],
     [/\u2022|\u2023|\u2043|\u2219|\u00B7/g, "-"],
     [/\u2044/g, "/"],
     [/\u02C6/g, "^"],
@@ -47,11 +48,28 @@ const sanitizeSpecialSymbols = (value: string) => {
   );
 };
 
-const normalizeForComparison = (value: string) =>
-  sanitizeSpecialSymbols(value)
+const normalizeForComparison = (value: string, targetForAlignment?: string) => {
+  const sanitizedValue = sanitizeSpecialSymbols(value);
+  let comparableValue = sanitizedValue;
+
+  if (targetForAlignment) {
+    const sanitizedTarget = sanitizeSpecialSymbols(targetForAlignment);
+    const alignedChars = Array.from(sanitizedTarget).map((targetChar, index) => {
+      if (targetChar === " ") {
+        return " ";
+      }
+
+      return sanitizedValue[index] ?? "";
+    });
+
+    comparableValue = alignedChars.join("");
+  }
+
+  return comparableValue
     .replace(/\r?\n/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+};
 
 export const TypingPanel = ({
   textToType,
@@ -84,8 +102,8 @@ export const TypingPanel = ({
     [textToType]
   );
   const normalizedTyped = useMemo(
-    () => normalizeForComparison(typed),
-    [typed]
+    () => normalizeForComparison(typed, textToType),
+    [typed, textToType]
   );
   const progressLabel =
     typeof sentenceIndex === "number" && typeof totalSentences === "number"
@@ -257,7 +275,8 @@ export const TypingPanel = ({
         {characters.map((char, index) => {
           const typedChar = typed[index];
           const isTyped = index < typed.length;
-          const isCorrect = typedChar === char;
+          const isSpace = char === " ";
+          const isCorrect = isSpace ? true : typedChar === char;
           const baseCharClass =
             char === "\n"
               ? "block w-full h-0"
