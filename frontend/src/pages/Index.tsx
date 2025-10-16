@@ -31,6 +31,7 @@ interface ApiSentence {
 
 const SEGMENT_END_PADDING = 0.5; // Tăng khoảng đệm để ngắt sớm hơn
 
+const DEFAULT_TRANSLATION_LANGUAGE = "vi";
 const getSegmentBounds = (sentence: Sentence) => {
   const adjustedEnd = Math.max(
     sentence.start,
@@ -63,8 +64,14 @@ const Index = () => {
   const [repeatCount, setRepeatCount] = useState(3);
   const [remainingRepeats, setRemainingRepeats] = useState(0);
   const lastSegmentRef = useRef<{ start: number; end: number } | null>(null);
+  const translationCacheRef = useRef<Map<string, string>>(new Map());
   const [completedSentences, setCompletedSentences] = useState<Set<number>>(
     new Set()
+  );
+  const [aiTranslation, setAiTranslation] = useState("");
+  const [isAiTranslating, setIsAiTranslating] = useState(false);
+  const [aiTranslationError, setAiTranslationError] = useState<string | null>(
+    null
   );
   const { toast } = useToast();
 
@@ -103,6 +110,11 @@ const Index = () => {
       }
 
       if (data.sentences && data.sentences.length > 0) {
+        translationCacheRef.current = new Map();
+        setAiTranslation("");
+        setAiTranslationError(null);
+        setIsAiTranslating(false);
+
         const processedSentences = data.sentences.map(
           (sentence: ApiSentence, index: number) => {
             const startTime = Number(sentence.start) || 0;
@@ -267,6 +279,95 @@ const Index = () => {
       ? `${currentSentenceData.text} ${nextSentenceData.text}`
       : currentSentenceData?.text || "";
 
+  useEffect(() => {
+    const trimmedText = dictationText.trim();
+
+    if (!trimmedText) {
+      setAiTranslation("");
+      setAiTranslationError(null);
+      setIsAiTranslating(false);
+      return;
+    }
+
+    const cacheKey = `${trimmedText}|||${DEFAULT_TRANSLATION_LANGUAGE}`;
+    const cachedTranslation = translationCacheRef.current.get(cacheKey);
+
+    if (cachedTranslation !== undefined) {
+      setAiTranslation(cachedTranslation);
+      setAiTranslationError(null);
+      setIsAiTranslating(false);
+      return;
+    }
+
+    let isCancelled = false;
+
+    const requestTranslation = async () => {
+      setIsAiTranslating(true);
+      setAiTranslation("");
+      setAiTranslationError(null);
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/translate`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            text: trimmedText,
+            target_language: DEFAULT_TRANSLATION_LANGUAGE,
+          }),
+        });
+
+        if (!response.ok) {
+          let detail = `Translation request failed (${response.status})`;
+
+          try {
+            const errorBody = await response.json();
+            detail =
+              errorBody?.detail ||
+              errorBody?.error ||
+              errorBody?.message ||
+              detail;
+          } catch {
+            // Ignore JSON parsing errors for non-JSON responses.
+          }
+
+          throw new Error(detail);
+        }
+
+        const data = (await response.json()) as { translation?: string };
+        const translated = (data.translation ?? "").trim();
+
+        translationCacheRef.current.set(cacheKey, translated);
+
+        if (!isCancelled) {
+          setAiTranslation(translated);
+          setAiTranslationError(null);
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          console.error("Translation error:", error);
+          setAiTranslation("");
+          setAiTranslationError(
+            error instanceof Error
+              ? error.message
+              : "Unable to fetch translation."
+          );
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsAiTranslating(false);
+        }
+      }
+    };
+
+    requestTranslation();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [dictationText]);
+
   const dictationTranslation =
     currentSentenceData && nextSentenceData
       ? `${currentSentenceData.translation}\n${nextSentenceData.translation}`
@@ -429,7 +530,10 @@ const Index = () => {
                     currentSentence={dictationText}
                     sentenceIndex={currentSentenceIndex}
                     totalSentences={sentences.length}
-                    translation={dictationTranslation}
+                    translation={aiTranslation || dictationTranslation}
+                    fallbackTranslation={dictationTranslation}
+                    isTranslationLoading={isAiTranslating}
+                    translationError={aiTranslationError}
                     onNext={handleNext}
                     onPrevious={handlePrevious}
                     onCheck={handleCheck}

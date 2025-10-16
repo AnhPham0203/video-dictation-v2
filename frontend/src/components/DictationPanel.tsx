@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Play, RotateCcw, Mic } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Play,
+  RotateCcw,
+  Mic,
+  Loader2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -16,7 +23,10 @@ interface DictationPanelProps {
   currentSentence: string;
   sentenceIndex: number;
   totalSentences: number;
-  translation: string;
+  translation?: string;
+  fallbackTranslation?: string;
+  isTranslationLoading?: boolean;
+  translationError?: string | null;
   onNext: () => void;
   onPrevious: () => void;
   onCheck: (userInput: string) => void;
@@ -31,6 +41,9 @@ export const DictationPanel = ({
   sentenceIndex,
   totalSentences,
   translation,
+  fallbackTranslation,
+  isTranslationLoading = false,
+  translationError = null,
   onNext,
   onPrevious,
   onCheck,
@@ -384,13 +397,38 @@ export const DictationPanel = ({
         </div>
 
         {/* Translation */}
-        {/* <Card className="p-4 bg-secondary">
-          <p className="text-sm text-muted-foreground mb-2">
-            Vietnamese Translation:
-          </p>
-          <p className="text-foreground">{translation}</p>
-          <p className="text-xs text-muted-foreground mt-2">Translated by AI</p>
-        </Card> */}
+        {(translation ||
+          fallbackTranslation ||
+          isTranslationLoading ||
+          translationError) && (
+          <Card className="p-4 bg-secondary space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                AI Translation (vi)
+              </p>
+              {isTranslationLoading && (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              )}
+            </div>
+            {translationError ? (
+              <div className="space-y-1">
+                <p className="text-sm text-red-400">{translationError}</p>
+                {fallbackTranslation && (
+                  <p className="text-foreground whitespace-pre-wrap">
+                    {fallbackTranslation}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-foreground whitespace-pre-wrap">
+                {translation || fallbackTranslation || "Translation unavailable."}
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Powered by Google Cloud Translation
+            </p>
+          </Card>
+        )}
 
         {/* Pronunciation Guide */}
         {awaitingConfirm && (

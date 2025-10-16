@@ -1,7 +1,18 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from backend.utils.youtube_service import fetch_youtube_captions
+from pydantic import BaseModel
+from typing import Optional
+
+from utils.youtube_service import fetch_youtube_captions
+from utils.translation_service import (
+    TranslationServiceError,
+    translate_text,
+)
+
+from dotenv import load_dotenv
+
+load_dotenv()
 app = FastAPI()
 
 # Allow the frontend to call this API from any origin
@@ -24,6 +35,30 @@ async def get_captions(request: Request):
         return {"sentences": sentences}
     except Exception as e:
         return {"error": str(e), "sentences": []}
+
+
+class TranslationRequest(BaseModel):
+    text: str
+    target_language: str = "vi"
+    source_language: Optional[str] = None
+
+
+@app.post("/api/translate")
+async def translate(request: TranslationRequest):
+    try:
+        translated = await translate_text(
+            text=request.text,
+            target_language=request.target_language,
+            source_language=request.source_language,
+        )
+        return {"translation": translated}
+    except TranslationServiceError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail="Unexpected error while translating text.",
+        ) from error
 
 
 if __name__ == "__main__":
