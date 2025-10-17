@@ -23,6 +23,7 @@ interface DictationPanelProps {
   currentSentence: string;
   sentenceIndex: number;
   totalSentences: number;
+  sentenceSessionId: number;
   translation?: string;
   fallbackTranslation?: string;
   isTranslationLoading?: boolean;
@@ -40,6 +41,7 @@ export const DictationPanel = ({
   currentSentence,
   sentenceIndex,
   totalSentences,
+  sentenceSessionId,
   translation,
   fallbackTranslation,
   isTranslationLoading = false,
@@ -66,17 +68,38 @@ export const DictationPanel = ({
     extraWords: Array<{ word: string; masked: string }>;
   } | null>(null);
   const [awaitingConfirm, setAwaitingConfirm] = useState(false);
+  const [showTranslation, setShowTranslation] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const isFirstRenderRef = useRef(true);
+  const previousSentenceIndexRef = useRef(sentenceIndex);
+  const previousModeRef = useRef(dictationMode);
+  const previousSentenceRef = useRef(currentSentence);
+  const previousSessionIdRef = useRef(sentenceSessionId);
 
   useEffect(() => {
-    setUserInput("");
-    setFeedback(null);
-    setAwaitingConfirm(false);
-    if (textareaRef.current) {
-      textareaRef.current.focus();
+    const hasSentenceChanged =
+      currentSentence !== previousSentenceRef.current ||
+      sentenceIndex !== previousSentenceIndexRef.current ||
+      dictationMode !== previousModeRef.current ||
+      sentenceSessionId !== previousSessionIdRef.current;
+
+    if (isFirstRenderRef.current || hasSentenceChanged) {
+      setUserInput("");
+      setFeedback(null);
+      setAwaitingConfirm(false);
+      setShowTranslation(false);
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+      }
     }
-  }, [currentSentence]);
+
+    isFirstRenderRef.current = false;
+    previousSentenceRef.current = currentSentence;
+    previousSentenceIndexRef.current = sentenceIndex;
+    previousModeRef.current = dictationMode;
+    previousSessionIdRef.current = sentenceSessionId;
+  }, [currentSentence, sentenceIndex, dictationMode, sentenceSessionId]);
 
   const sanitizeSpecialSymbols = (value: string) => {
     if (!value) return "";
@@ -202,11 +225,13 @@ export const DictationPanel = ({
 
     if (isPerfect) {
       setAwaitingConfirm(true);
+      setShowTranslation(true);
       setUserInput(currentSentence);
       return;
     }
 
     setAwaitingConfirm(false);
+    setShowTranslation(false);
   };
 
   const handleNextSentence = () => {
@@ -235,7 +260,7 @@ export const DictationPanel = ({
   };
 
   return (
-    <div className="h-full flex flex-col gap-6 p-6 bg-panel-bg rounded-lg">
+    <div className="flex flex-col gap-6 p-6 bg-panel-bg rounded-lg">
       {/* Progress and Navigation */}
       <div className="flex items-center justify-between">
         <Button
@@ -306,6 +331,7 @@ export const DictationPanel = ({
             }
             if (awaitingConfirm) {
               setAwaitingConfirm(false);
+              setShowTranslation(false);
             }
           }}
           onKeyDown={(event) => {
@@ -397,10 +423,11 @@ export const DictationPanel = ({
         </div>
 
         {/* Translation */}
-        {(translation ||
-          fallbackTranslation ||
-          isTranslationLoading ||
-          translationError) && (
+        {showTranslation &&
+          (translation ||
+            fallbackTranslation ||
+            isTranslationLoading ||
+            translationError) && (
           <Card className="p-4 bg-secondary space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">

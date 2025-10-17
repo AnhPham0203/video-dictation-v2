@@ -54,6 +54,7 @@ const Index = () => {
   const [inputUrl, setInputUrl] = useState("");
   const [currentTab, setCurrentTab] = useState("dictation");
   const [sentences, setSentences] = useState<Sentence[]>([]);
+  const [sentenceSessionId, setSentenceSessionId] = useState(0);
   const [currentSentenceIndex, setCurrentSentenceIndex] = useState(0);
   const [dictationMode, setDictationMode] = useState<number>(1);
   const [isVideoCovered, setIsVideoCovered] = useState(false);
@@ -150,6 +151,7 @@ const Index = () => {
         );
 
         setSentences(processedSentences);
+        setSentenceSessionId((prev) => prev + 1);
         setCurrentSentenceIndex(0);
         setCompletedSentences(new Set());
         toast({
@@ -430,7 +432,7 @@ const Index = () => {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-140px)]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:min-h-[calc(100vh-140px)]">
           {/* Left: Video Player */}
           <div className="relative flex flex-col gap-4">
             <VideoPlayer
@@ -460,11 +462,11 @@ const Index = () => {
           </div>
 
           {/* Right: Dictation/Transcript Panel */}
-          <div className="flex flex-col h-full min-h-0">
+          <div className="flex flex-col lg:min-h-0">
             <Tabs
               value={currentTab}
               onValueChange={setCurrentTab}
-              className="flex-1 flex flex-col overflow-hidden"
+              className="flex flex-col lg:flex-1 lg:min-h-0"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -524,12 +526,13 @@ const Index = () => {
                 </ToggleGroup>
               </div>
 
-              <TabsContent value="dictation" className="flex-1 mt-4">
+              <TabsContent value="dictation" className="mt-4 lg:flex-1">
                 {sentences.length > 0 ? (
                   <DictationPanel
                     currentSentence={dictationText}
                     sentenceIndex={currentSentenceIndex}
                     totalSentences={sentences.length}
+                    sentenceSessionId={sentenceSessionId}
                     translation={aiTranslation || dictationTranslation}
                     fallbackTranslation={dictationTranslation}
                     isTranslationLoading={isAiTranslating}
@@ -553,7 +556,7 @@ const Index = () => {
 
               <TabsContent
                 value="transcript"
-                className="flex-1 mt-4 overflow-hidden min-h-0"
+                className="mt-4 lg:flex-1 lg:min-h-0 lg:overflow-hidden"
               >
                 <TranscriptView
                   sentences={sentences}
@@ -562,7 +565,7 @@ const Index = () => {
                 />
               </TabsContent>
 
-              <TabsContent value="typing" className="flex-1 mt-4">
+              <TabsContent value="typing" className="mt-4 lg:flex-1">
                 {sentences.length > 0 ? (
                   <TypingPanel
                     textToType={dictationText}
