@@ -1,5 +1,4 @@
 import { Card } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface TranscriptViewProps {
   sentences: Array<{ text: string; translation: string; timestamp: string }>;
@@ -14,25 +13,25 @@ export const TranscriptView = ({
 }: TranscriptViewProps) => {
   return (
     <div className="h-full min-h-0">
-      <ScrollArea className="h-full">
+      <div className="h-full overflow-y-auto pr-2 transcript-scrollbar">
         <div className="space-y-3 p-6">
           {sentences.map((sentence, index) => (
             <Card
               key={index}
-              className={`p-4 cursor-pointer transition-all ${
+              className={`cursor-pointer p-4 transition-all ${
                 index === currentIndex
-                  ? "bg-primary/20 border-primary"
+                  ? "border-primary bg-primary/20"
                   : "bg-card hover:bg-card/80"
               }`}
               onClick={() => onSentenceClick(index)}
             >
               <div className="flex items-start gap-3">
-                <span className="text-xs text-muted-foreground font-mono min-w-[60px]">
+                <span className="min-w-[60px] font-mono text-xs text-muted-foreground">
                   {sentence.timestamp}
                 </span>
                 <div className="flex-1">
-                  <p className="text-foreground mb-2">{sentence.text}</p>
-                  <p className="text-sm text-muted-foreground italic">
+                  <p className="mb-2 text-foreground">{sentence.text}</p>
+                  <p className="text-sm italic text-muted-foreground">
                     {sentence.translation}
                   </p>
                 </div>
@@ -40,7 +39,7 @@ export const TranscriptView = ({
             </Card>
           ))}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 };

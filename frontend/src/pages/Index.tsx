@@ -29,7 +29,7 @@ interface ApiSentence {
   duration?: string | number;
 }
 
-const SEGMENT_END_PADDING = 0.5; // Tăng khoảng đệm để ngắt sớm hơn
+const SEGMENT_END_PADDING = 0.1; // Tăng khoảng đệm để ngắt sớm hơn
 
 const DEFAULT_TRANSLATION_LANGUAGE = "vi";
 const getSegmentBounds = (sentence: Sentence) => {
@@ -462,11 +462,11 @@ const Index = () => {
           </div>
 
           {/* Right: Dictation/Transcript Panel */}
-          <div className="flex flex-col lg:min-h-0">
+          <div className="flex flex-col flex-1 min-h-0">
             <Tabs
               value={currentTab}
               onValueChange={setCurrentTab}
-              className="flex flex-col lg:flex-1 lg:min-h-0"
+              className="flex flex-col flex-1 min-h-0"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -543,7 +543,9 @@ const Index = () => {
                     onPlaySentence={() => playCurrentSentence()}
                     dictationMode={dictationMode}
                     repeatCount={repeatCount}
-                    onRepeatCountChange={(value) => setRepeatCount(Math.max(1, value))}
+                    onRepeatCountChange={(value) =>
+                      setRepeatCount(Math.max(1, value))
+                    }
                   />
                 ) : (
                   <div className="flex items-center justify-center h-full">
@@ -556,7 +558,7 @@ const Index = () => {
 
               <TabsContent
                 value="transcript"
-                className="mt-4 lg:flex-1 lg:min-h-0 lg:overflow-hidden"
+                className="mt-4 flex-1 min-h-0 overflow-hidden"
               >
                 <TranscriptView
                   sentences={sentences}

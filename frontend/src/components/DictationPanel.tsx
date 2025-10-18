@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -18,6 +18,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+declare global {
+  interface Window {
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
+}
 
 interface DictationPanelProps {
   currentSentence: string;
@@ -76,6 +82,10 @@ export const DictationPanel = ({
   const previousModeRef = useRef(dictationMode);
   const previousSentenceRef = useRef(currentSentence);
   const previousSessionIdRef = useRef(sentenceSessionId);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isSpeechSupported, setIsSpeechSupported] = useState(true);
+  const [speechError, setSpeechError] = useState<string | null>(null);
 
   useEffect(() => {
     const hasSentenceChanged =
@@ -85,6 +95,11 @@ export const DictationPanel = ({
       sentenceSessionId !== previousSessionIdRef.current;
 
     if (isFirstRenderRef.current || hasSentenceChanged) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsRecording(false);
+      setSpeechError(null);
       setUserInput("");
       setFeedback(null);
       setAwaitingConfirm(false);
@@ -101,7 +116,7 @@ export const DictationPanel = ({
     previousSessionIdRef.current = sentenceSessionId;
   }, [currentSentence, sentenceIndex, dictationMode, sentenceSessionId]);
 
-  const sanitizeSpecialSymbols = (value: string) => {
+  const sanitizeSpecialSymbols = useCallback((value: string | null | undefined) => {
     if (!value) return "";
 
     const replacements: Array<[RegExp, string]> = [
@@ -126,7 +141,94 @@ export const DictationPanel = ({
       (text, [pattern, replacement]) => text.replace(pattern, replacement),
       value
     );
-  };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const win = window as Window &
+      typeof globalThis & {
+        SpeechRecognition?: typeof SpeechRecognition;
+        webkitSpeechRecognition?: typeof SpeechRecognition;
+      };
+
+    const SpeechRecognitionConstructor =
+      win.SpeechRecognition ?? win.webkitSpeechRecognition;
+
+    if (!SpeechRecognitionConstructor) {
+      setIsSpeechSupported(false);
+      return;
+    }
+
+    setIsSpeechSupported(true);
+
+    const recognition: SpeechRecognition = new SpeechRecognitionConstructor();
+    recognition.lang = "en-US";
+    recognition.interimResults = true;
+    recognition.continuous = true;
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let finalTranscript = "";
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          finalTranscript += result[0]?.transcript ?? "";
+        }
+      }
+
+      const sanitizedTranscript = sanitizeSpecialSymbols(finalTranscript).trim();
+      if (!sanitizedTranscript) {
+        return;
+      }
+
+      setUserInput((prev) => {
+        const trimmedPrev = prev.trim();
+        const combined = trimmedPrev
+          ? `${trimmedPrev} ${sanitizedTranscript}`
+          : sanitizedTranscript;
+        return combined;
+      });
+      setFeedback(null);
+      setAwaitingConfirm(false);
+      setShowTranslation(false);
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+      }
+    };
+
+    recognition.onstart = () => {
+      setIsRecording(true);
+      setSpeechError(null);
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      const message =
+        event?.error === "not-allowed"
+          ? "Microphone access was denied. Please allow access and try again."
+          : event?.error === "no-speech"
+          ? "No speech detected. Try speaking again."
+          : event?.message || event?.error || "Speech recognition error.";
+      setSpeechError(message);
+      setIsRecording(false);
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      recognition.onresult = null;
+      recognition.onstart = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      recognition.stop();
+      recognitionRef.current = null;
+    };
+  }, [sanitizeSpecialSymbols]);
 
   const normalizeWord = (word: string | null | undefined) => {
     if (!word) return "";
@@ -137,6 +239,29 @@ export const DictationPanel = ({
   };
 
   const maskWord = (word: string) => "*".repeat(word.length || 1);
+
+  const handleToggleRecording = () => {
+    const recognition = recognitionRef.current;
+    if (!recognition) {
+      return;
+    }
+
+    if (isRecording) {
+      recognition.stop();
+      return;
+    }
+
+    setSpeechError(null);
+    try {
+      recognition.start();
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to start speech recognition. Please try again.";
+      setSpeechError(message);
+    }
+  };
 
   const handleCheck = () => {
     const sanitizedInput = sanitizeSpecialSymbols(userInput);
@@ -237,12 +362,18 @@ export const DictationPanel = ({
   const handleNextSentence = () => {
     setUserInput("");
     setFeedback(null);
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
     onNext();
   };
 
   const handlePreviousSentence = () => {
     setUserInput("");
     setFeedback(null);
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
     onPrevious();
   };
 
@@ -417,10 +548,47 @@ export const DictationPanel = ({
           >
             <RotateCcw className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="hover:bg-secondary">
-            <Mic className="h-4 w-4" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`hover:bg-secondary ${
+              isRecording ? "text-destructive" : ""
+            }`}
+            onClick={handleToggleRecording}
+            disabled={!isSpeechSupported}
+            title={
+              !isSpeechSupported
+                ? "Speech recognition is not supported in this browser."
+                : isRecording
+                ? "Stop recording"
+                : "Start recording"
+            }
+          >
+            {isRecording ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Mic className="h-4 w-4" />
+            )}
           </Button>
         </div>
+
+        {(!isSpeechSupported || speechError || isRecording) && (
+          <p
+            className={`mt-1 text-xs ${
+              !isSpeechSupported
+                ? "text-muted-foreground"
+                : speechError
+                ? "text-red-500"
+                : "text-primary"
+            }`}
+          >
+            {!isSpeechSupported
+              ? "Speech recognition is not supported in this browser."
+              : speechError
+              ? speechError
+              : "Listening... Tap the microphone button to stop."}
+          </p>
+        )}
 
         {/* Translation */}
         {showTranslation &&
