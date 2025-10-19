@@ -6,6 +6,7 @@ import {
   RotateCcw,
   Mic,
   Loader2,
+  CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -86,6 +87,41 @@ export const DictationPanel = ({
   const [isRecording, setIsRecording] = useState(false);
   const [isSpeechSupported, setIsSpeechSupported] = useState(true);
   const [speechError, setSpeechError] = useState<string | null>(null);
+
+  const renderPlaybackControls = () => (
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => setUserInput("")}
+        className="hover:bg-secondary"
+      >
+        <RotateCcw className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        className={`hover:bg-secondary ${
+          isRecording ? "text-destructive" : ""
+        }`}
+        onClick={handleToggleRecording}
+        disabled={!isSpeechSupported}
+        title={
+          !isSpeechSupported
+            ? "Speech recognition is not supported in this browser."
+            : isRecording
+            ? "Stop recording"
+            : "Start recording"
+        }
+      >
+        {isRecording ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Mic className="h-4 w-4" />
+        )}
+      </Button>
+    </>
+  );
 
   useEffect(() => {
     const hasSentenceChanged =
@@ -335,9 +371,7 @@ export const DictationPanel = ({
     setFeedback({
       type: isPerfect ? "correct" : hasAnyCorrect ? "partial" : "incorrect",
       message: isPerfect
-        ? awaitingConfirm
-          ? "✔ Chính xác! Tuyệt vời!"
-          : "✔ Chính xác! Nhấn Enter lần nữa để sang câu mới."
+        ? "you are correct"
         : hasAnyCorrect
         ? "Một số từ đã đúng, tiếp tục chỉnh sửa nhé."
         : "Chưa chính xác, hãy xem lại các từ được tô đỏ.",
@@ -478,99 +512,85 @@ export const DictationPanel = ({
 
         {feedback && (
           <div className="rounded-md border border-border bg-card/60 p-4">
-            <div className="mb-2 flex items-center justify-between">
-              <p
-                className={`font-semibold ${
-                  feedback.type === "correct" ? "text-correct" : "text-error"
-                }`}
-              >
-                {feedback.message}
-              </p>
-              <span className="text-sm font-medium text-muted-foreground">
-                Độ chính xác: {feedback.accuracy}%
-              </span>
-            </div>
-
-            <div className="flex flex-wrap gap-2 text-lg">
-              {feedback.breakdown.map((item, index) => {
-                const isCorrect = item.status === "correct";
-                const isMissing = item.status === "missing";
-                const displayText = isCorrect
-                  ? item.expected
-                  : isMissing
-                  ? item.maskedExpected
-                  : item.maskedExpected;
-
-                return (
-                  <span
-                    key={`${item.expected}-${index}`}
-                    className={`rounded px-2 py-1 ${
-                      isCorrect
-                        ? "bg-green-100 text-green-800"
-                        : "bg-red-100 text-red-800"
+            {feedback.type === "correct" ? (
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2 font-semibold text-correct">
+                  <CheckCircle className="h-5 w-5" />
+                  <p>{feedback.message}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {renderPlaybackControls()}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="mb-2 flex items-center justify-between">
+                  <p
+                    className={`font-semibold ${
+                      feedback.type === "correct" ? "text-correct" : "text-error"
                     }`}
                   >
-                    {displayText}
-                    {!isCorrect && !isMissing && (
-                      <span className="ml-1  italic text-red-800">
-                        → {item.expected}
-                      </span>
-                    )}
+                    {feedback.message}
+                  </p>
+                  <span className="text-sm font-medium text-muted-foreground">
+                    Độ chính xác: {feedback.accuracy}%
                   </span>
-                );
-              })}
+                </div>
+                <div className="flex flex-wrap gap-2 text-lg">
+                  {feedback.breakdown.map((item, index) => {
+                    const isCorrect = item.status === "correct";
+                    const isMissing = item.status === "missing";
+                    const displayText = isCorrect
+                      ? item.expected
+                      : isMissing
+                      ? item.maskedExpected
+                      : item.maskedExpected;
 
-              {feedback.extraWords.map((extra, index) => (
-                <span
-                  key={`extra-${extra.word}-${index}`}
-                  className="rounded bg-yellow-100 px-2 py-1 text-yellow-800"
-                >
-                  {extra.masked}
-                  <span className="ml-1 italic text-yellow-700">(thừa)</span>
-                </span>
-              ))}
-            </div>
+                    return (
+                      <span
+                        key={`${item.expected}-${index}`}
+                        className={`rounded px-2 py-1 ${
+                          isCorrect
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                        }`}
+                      >
+                        {displayText}
+                        {!isCorrect && !isMissing && (
+                          <span className="ml-1  italic text-red-800">
+                            → {item.expected}
+                          </span>
+                        )}
+                      </span>
+                    );
+                  })}
+
+                  {feedback.extraWords.map((extra, index) => (
+                    <span
+                      key={`extra-${extra.word}-${index}`}
+                      className="rounded bg-yellow-100 px-2 py-1 text-yellow-800"
+                    >
+                      {extra.masked}
+                      <span className="ml-1 italic text-yellow-700">(thừa)</span>
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
 
-        <div className="flex gap-2">
-          <Button
-            onClick={handleCheck}
-            className="flex-1 bg-primary hover:bg-primary/90"
-          >
-            Check
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setUserInput("")}
-            className="hover:bg-secondary"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`hover:bg-secondary ${
-              isRecording ? "text-destructive" : ""
-            }`}
-            onClick={handleToggleRecording}
-            disabled={!isSpeechSupported}
-            title={
-              !isSpeechSupported
-                ? "Speech recognition is not supported in this browser."
-                : isRecording
-                ? "Stop recording"
-                : "Start recording"
-            }
-          >
-            {isRecording ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Mic className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
+        {!awaitingConfirm && (
+          <div className="flex gap-2">
+            <Button
+              onClick={handleCheck}
+              className="flex-1 bg-primary hover:bg-primary/90"
+            >
+              Check
+            </Button>
+            {renderPlaybackControls()}
+          </div>
+        )}
 
         {(!isSpeechSupported || speechError || isRecording) && (
           <p
@@ -619,9 +639,9 @@ export const DictationPanel = ({
                 {translation || fallbackTranslation || "Translation unavailable."}
               </p>
             )}
-            <p className="text-xs text-muted-foreground">
+            {/* <p className="text-xs text-muted-foreground">
               Powered by Google Cloud Translation
-            </p>
+            </p> */}
           </Card>
         )}
 
