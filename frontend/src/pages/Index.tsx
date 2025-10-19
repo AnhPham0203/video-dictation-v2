@@ -282,6 +282,11 @@ const Index = () => {
       : currentSentenceData?.text || "";
 
   useEffect(() => {
+    if (currentTab !== "dictation") {
+      setIsAiTranslating(false);
+      return;
+    }
+
     const trimmedText = dictationText.trim();
 
     if (!trimmedText) {
@@ -368,7 +373,7 @@ const Index = () => {
     return () => {
       isCancelled = true;
     };
-  }, [dictationText]);
+  }, [dictationText, currentTab]);
 
   const dictationTranslation =
     currentSentenceData && nextSentenceData
