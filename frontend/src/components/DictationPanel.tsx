@@ -152,32 +152,35 @@ export const DictationPanel = ({
     previousSessionIdRef.current = sentenceSessionId;
   }, [currentSentence, sentenceIndex, dictationMode, sentenceSessionId]);
 
-  const sanitizeSpecialSymbols = useCallback((value: string | null | undefined) => {
-    if (!value) return "";
+  const sanitizeSpecialSymbols = useCallback(
+    (value: string | null | undefined) => {
+      if (!value) return "";
 
-    const replacements: Array<[RegExp, string]> = [
-      [/\u2018|\u2019|\u201A|\u201B|\u2032|\u2035/g, "'"],
-      [/\u201C|\u201D|\u201E|\u201F|\u2033|\u2036/g, '"'],
-      [/\u2010|\u2011|\u2012|\u2013|\u2014|\u2015|\u2212/g, "-"],
-      [/\u2026/g, "..."],
-      [/\u2022|\u2023|\u2043|\u2219|\u00B7/g, "-"],
-      [/\u2044/g, "/"],
-      [/\u02C6/g, "^"],
-      [/\u02DC/g, "~"],
-      [/\u00B0/g, "deg"],
-      [/\u00A9/g, "(c)"],
-      [/\u00AE/g, "(r)"],
-      [/\u2122/g, "TM"],
-      [/\u00A0|[\u2000-\u200B]|\u202F|\u205F|\u3000/g, " "],
-      [/[\u200C-\u200D]|\uFEFF/g, ""],
-      [/♪/g, ""],
-    ];
+      const replacements: Array<[RegExp, string]> = [
+        [/\u2018|\u2019|\u201A|\u201B|\u2032|\u2035/g, "'"],
+        [/\u201C|\u201D|\u201E|\u201F|\u2033|\u2036/g, '"'],
+        [/\u2010|\u2011|\u2012|\u2013|\u2014|\u2015|\u2212/g, "-"],
+        [/\u2026/g, "..."],
+        [/\u2022|\u2023|\u2043|\u2219|\u00B7/g, "-"],
+        [/\u2044/g, "/"],
+        [/\u02C6/g, "^"],
+        [/\u02DC/g, "~"],
+        [/\u00B0/g, "deg"],
+        [/\u00A9/g, "(c)"],
+        [/\u00AE/g, "(r)"],
+        [/\u2122/g, "TM"],
+        [/\u00A0|[\u2000-\u200B]|\u202F|\u205F|\u3000/g, " "],
+        [/[\u200C-\u200D]|\uFEFF/g, ""],
+        [/♪/g, ""],
+      ];
 
-    return replacements.reduce(
-      (text, [pattern, replacement]) => text.replace(pattern, replacement),
-      value
-    );
-  }, []);
+      return replacements.reduce(
+        (text, [pattern, replacement]) => text.replace(pattern, replacement),
+        value
+      );
+    },
+    []
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -214,7 +217,8 @@ export const DictationPanel = ({
         }
       }
 
-      const sanitizedTranscript = sanitizeSpecialSymbols(finalTranscript).trim();
+      const sanitizedTranscript =
+        sanitizeSpecialSymbols(finalTranscript).trim();
       if (!sanitizedTranscript) {
         return;
       }
@@ -371,10 +375,10 @@ export const DictationPanel = ({
     setFeedback({
       type: isPerfect ? "correct" : hasAnyCorrect ? "partial" : "incorrect",
       message: isPerfect
-        ? "you are correct"
+        ? "You are correct"
         : hasAnyCorrect
-        ? "Một số từ đã đúng, tiếp tục chỉnh sửa nhé."
-        : "Chưa chính xác, hãy xem lại các từ được tô đỏ.",
+        ? "Some words are correct, please continue editing."
+        : "Incorrect, please review the words in red.",
       accuracy,
       breakdown,
       extraWords,
@@ -507,11 +511,11 @@ export const DictationPanel = ({
               }
             }
           }}
-          className="min-h-[120px] bg-background border-input focus:border-input-focus focus:ring-input-focus resize-none text-lg"
+          className="min-h-[95px] bg-background border-input focus:border-input-focus focus:ring-input-focus resize-none text-lg"
         />
 
         {feedback && (
-          <div className="rounded-md border border-border bg-card/60 p-4">
+          <div className="rounded-md border border-border bg-card/60">
             {feedback.type === "correct" ? (
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2 font-semibold text-correct">
@@ -527,7 +531,9 @@ export const DictationPanel = ({
                 <div className="mb-2 flex items-center justify-between">
                   <p
                     className={`font-semibold ${
-                      feedback.type === "correct" ? "text-correct" : "text-error"
+                      feedback.type === "correct"
+                        ? "text-correct"
+                        : "text-error"
                     }`}
                   >
                     {feedback.message}
@@ -571,7 +577,9 @@ export const DictationPanel = ({
                       className="rounded bg-yellow-100 px-2 py-1 text-yellow-800"
                     >
                       {extra.masked}
-                      <span className="ml-1 italic text-yellow-700">(thừa)</span>
+                      <span className="ml-1 italic text-yellow-700">
+                        (thừa)
+                      </span>
                     </span>
                   ))}
                 </div>
@@ -616,34 +624,36 @@ export const DictationPanel = ({
             fallbackTranslation ||
             isTranslationLoading ||
             translationError) && (
-          <Card className="p-4 bg-secondary space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                AI Translation (vi)
-              </p>
-              {isTranslationLoading && (
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              )}
-            </div>
-            {translationError ? (
-              <div className="space-y-1">
-                <p className="text-sm text-red-400">{translationError}</p>
-                {fallbackTranslation && (
-                  <p className="text-foreground whitespace-pre-wrap">
-                    {fallbackTranslation}
-                  </p>
+            <Card className="p-4 bg-secondary space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  AI Translation (vi)
+                </p>
+                {isTranslationLoading && (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 )}
               </div>
-            ) : (
-              <p className="text-foreground whitespace-pre-wrap">
-                {translation || fallbackTranslation || "Translation unavailable."}
-              </p>
-            )}
-            {/* <p className="text-xs text-muted-foreground">
+              {translationError ? (
+                <div className="space-y-1">
+                  <p className="text-sm text-red-400">{translationError}</p>
+                  {fallbackTranslation && (
+                    <p className="text-foreground whitespace-pre-wrap">
+                      {fallbackTranslation}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-foreground whitespace-pre-wrap">
+                  {translation ||
+                    fallbackTranslation ||
+                    "Translation unavailable."}
+                </p>
+              )}
+              {/* <p className="text-xs text-muted-foreground">
               Powered by Google Cloud Translation
             </p> */}
-          </Card>
-        )}
+            </Card>
+          )}
 
         {/* Pronunciation Guide */}
         {awaitingConfirm && (
