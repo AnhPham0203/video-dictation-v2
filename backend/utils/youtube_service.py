@@ -201,12 +201,14 @@ def fetch_youtube_captions(video_id: str):
         # api = YouTubeTranscriptApi()
         http_proxy = os.getenv("HTTP_PROXY")
         https_proxy = os.getenv("HTTPS_PROXY")
+
+
         ytt_api = YouTubeTranscriptApi(
             proxy_config = GenericProxyConfig(
                 http_url=http_proxy,
                 https_url=https_proxy,
-    )
-)
+            )
+        )
         transcript = ytt_api.fetch(video_id, languages=ENGLISH_LANGS)
     except Exception as error:
         raise Exception(f"Cannot fetch captions: {error}") from error
