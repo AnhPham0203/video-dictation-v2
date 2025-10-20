@@ -3,6 +3,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 import httpx
 from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api.proxies import GenericProxyConfig
 
 YOUTUBE_API_BASE_URL = "https://www.googleapis.com/youtube/v3"
 
@@ -197,8 +198,16 @@ def fetch_youtube_captions(video_id: str):
         return [_with_timestamp(segment) for segment in normalized]
 
     try:
-        api = YouTubeTranscriptApi()
-        transcript = api.fetch(video_id, languages=ENGLISH_LANGS)
+        # api = YouTubeTranscriptApi()
+        http_proxy = os.getenv("HTTP_PROXY")
+        https_proxy = os.getenv("HTTPS_PROXY")
+        ytt_api = YouTubeTranscriptApi(
+        proxy_config = GenericProxyConfig(
+        http_url=http_proxy,
+        https_url=https_proxy,
+    )
+)
+        transcript = ytt_api.fetch(video_id, languages=ENGLISH_LANGS)
     except Exception as error:
         raise Exception(f"Cannot fetch captions: {error}") from error
 
