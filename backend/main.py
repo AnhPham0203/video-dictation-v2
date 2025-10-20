@@ -4,7 +4,7 @@ import uvicorn
 from pydantic import BaseModel
 from typing import Optional
 
-from utils.youtube_service import fetch_youtube_captions
+from backend.utils.youtube_service import fetch_youtube_captions
 from utils.translation_service import (
     TranslationServiceError,
     translate_text,
