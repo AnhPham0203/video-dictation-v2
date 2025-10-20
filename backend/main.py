@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 from backend.utils.youtube_service import fetch_youtube_captions
-from utils.translation_service import (
+from backend.utils.translation_service import (
     TranslationServiceError,
     translate_text,
 )
