@@ -25,3 +25,5 @@ frontend/pnpm-debug.log*
 
 # Root logs
 logs/
+.vercel
+.env

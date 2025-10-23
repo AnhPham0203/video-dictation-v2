@@ -1,4 +1,0 @@
-fastapi
-uvicorn[standard]
-youtube-transcript-api
-httpx

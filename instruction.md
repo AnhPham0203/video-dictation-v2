@@ -1,109 +1,86 @@
-# Hướng Dẫn Dự Án Video Dictation
+# Huong Dan Du An Video Dictation
 
-Tài liệu này cung cấp hướng dẫn chi tiết về kiến trúc, công nghệ và quy trình làm việc của dự án Video Dictation. Mục tiêu là để giúp các lập trình viên (bao gồm cả AI) có thể hiểu và phát triển dự án một cách hiệu quả và nhất quán.
+Tai lieu nay mo ta kien truc hien tai cua du an Video Dictation va cach thuc lam viec voi codebase sau khi tach thanh frontend (React) va cac API serverless.
 
-## 1. Tổng Quan Dự Án
+## 1. Tong quan
 
-Video Dictation là một ứng dụng web cho phép người dùng luyện kỹ năng nghe-chép tiếng Anh thông qua các video trên YouTube. Người dùng có thể dán URL của video, ứng dụng sẽ tải phụ đề và chia thành từng câu để người dùng nghe và gõ lại.
+Video Dictation giup luyen nghe va chinh ta tieng Anh thong qua video YouTube:
+- Nhap URL YouTube, he thong tu dong lay phu de.
+- Luyen nghe theo tung cau (hoac hai cau) voi che do Dictation, Typing, Transcript.
+- Tu dong phat lai doan video tuong ung, danh dau tien do hoan thanh va thong bao loi.
+- Co the goi API dich de hien thi ban dich tieng Viet.
 
-**Chức năng chính:**
-- Tải phụ đề từ video YouTube.
-- Cung cấp giao diện nghe-chép từng câu hoặc hai câu một lần.
-- Phát lại đoạn video tương ứng với câu đang luyện tập.
-- Kiểm tra độ chính xác của câu người dùng nhập vào.
-- Hiển thị bản dịch và toàn bộ bản ghi của video.
-- Che/hiện video để tập trung vào kỹ năng nghe.
+## 2. Cau truc thu muc
 
-## 2. Cấu Trúc Thư Mục
+- `frontend/`: ung dung React (Vite + TypeScript + Tailwind + shadcn-ui).
+- `api/`: cac ham serverless (Vercel/Node) dung de lay phu de (`get-captions.js`) va dich (`translate.js`).
+- `node_modules/`, `package.json`, `.env` goc phu vu chung cho serverless.
 
-Dự án được chia thành hai phần chính:
+> Thu muc `backend/` cu dang de trong de giu lich su; tat ca logic backend da duoc thay bang ham serverless trong `api/`.
 
--   `/frontend`: Chứa mã nguồn cho giao diện người dùng (client-side), được xây dựng bằng React.
--   `/backend`: Chứa mã nguồn cho máy chủ (server-side), được xây dựng bằng Python và FastAPI.
-
-## 3. Công Nghệ Sử Dụng
+## 3. Cong nghe su dung
 
 ### Frontend
+- React 18, Vite, TypeScript.
+- Tailwind CSS, shadcn-ui.
+- React Router DOM cho dinh tuyen.
+- ESLint/TypeScript cho linting va kieu.
 
--   **Framework:** React 18
--   **Build Tool:** Vite
--   **Ngôn ngữ:** TypeScript
--   **Styling:** Tailwind CSS
--   **UI Components:** shadcn-ui
--   **Quản lý trạng thái:** React Hooks (`useState`, `useEffect`)
--   **Routing:** React Router DOM
--   **Linting:** ESLint
+### API serverless
+- Node.js (CommonJS) chay tren Vercel.
+- `youtube-transcript` lay phu de tu YouTube.
+- `axios` goi Google Cloud Translation API (yeu cau `GOOGLE_API_KEY`).
 
-### Backend
+## 4. Cai dat & chay
 
--   **Framework:** FastAPI
--   **Ngôn ngữ:** Python
--   **Web Server:** Uvicorn
--   **Phụ thuộc chính:** `fastapi`, `uvicorn`, `youtube_transcript_api` (suy đoán)
+### 4.1 Chuan bi
+1. Cai dependencies chung:
+   ```bash
+   npm install
+   ```
+2. Tao file `.env` o thu muc goc va dien `GOOGLE_API_KEY=` (key luu tren local, khong commit). Co the tao them `frontend/.env` cho bien rieng cua client.
 
-## 4. Cài Đặt và Chạy Dự Án
+### 4.2 Chay moi truong phat trien
 
-### Frontend
+**Lua chon A – `vercel dev` (de nhat):**
+```bash
+npm install -g vercel
+vercel dev
+```
+Lenh nay chay ca frontend (http://localhost:3000) va proxy cac ham trong `api/`.
 
-1.  Di chuyển vào thư mục `frontend`:
-    ```bash
-    cd frontend
-    ```
-2.  Cài đặt các gói phụ thuộc:
-    ```bash
-    npm install
-    ```
-3.  Chạy máy chủ phát triển:
-    ```bash
-    npm run dev
-    ```
-    Ứng dụng sẽ chạy tại `http://localhost:5173` (hoặc một cổng khác nếu 5173 đã được sử dụng).
+**Lua chon B – chi chay Vite:**
+1. Cap nhat `frontend/.env` voi `VITE_API_BASE_URL` tro den backend dang chay (vd Render hoac Vercel staging).
+2. Chay Vite:
+   ```bash
+   cd frontend
+   npm install
+   npm run dev -- --port 8080
+   ```
 
-### Backend
+Frontend se doc `VITE_API_BASE_URL` va tu dong ghep voi duong dan `/api/*`.
 
-1.  Di chuyển vào thư mục `backend`:
-    ```bash
-    cd backend
-    ```
-2.  Tạo môi trường ảo (khuyến khích):
-    ```bash
-    python -m venv venv
-    source venv/bin/activate  # Trên Windows: venv\Scripts\activate
-    ```
-3.  Cài đặt các gói phụ thuộc (cần tạo tệp `requirements.txt` trước):
-    ```bash
-    pip install -r requirements.txt
-    ```
-4.  Chạy máy chủ:
-    ```bash
-    uvicorn main:app --reload --port 5000
-    ```
-    API sẽ có sẵn tại `http://localhost:5000`.
+### 4.3 Build
+```bash
+cd frontend
+npm run build
+```
 
-> 💡 **Triển khai trên Render:** Xem tài liệu `backend/RENDER_DEPLOYMENT.md` và file cấu hình `render.yaml` để thiết lập dịch vụ FastAPI trên Render thông qua Blueprint.
+## 5. Thanh phan quan trong
 
-## 5. Kiến Trúc Chi Tiết
+- `frontend/src/pages/Index.tsx`: quan ly trang chu, goi API lay phu de/dich, dieu khien che do luyen tap.
+- `frontend/src/components/VideoPlayer.tsx`: nhung YouTube IFrame API va dieu khien phat lai theo doan.
+- `frontend/src/components/DictationPanel.tsx`: giao dien nhap/cham chinh ta, dinh nghia feedback.
+- `frontend/src/components/TranscriptView.tsx`: xem toan bo phu de va nhay den cau bat ky.
+- `frontend/src/components/TypingPanel.tsx`: che do go lai cau.
+- `api/get-captions.js`: goi `youtube-transcript` va tra ve danh sach cau.
+- `api/translate.js`: goi Google Translate API theo key cung cap.
 
-### Frontend
+## 6. Quy uoc lam viec
 
--   **`src/pages/Index.tsx`**: Đây là thành phần chính của ứng dụng, nơi quản lý hầu hết các trạng thái quan trọng như danh sách câu, câu hiện tại, chế độ nghe chép, v.v. Nó cũng chứa logic để gọi API từ backend và xử lý các sự kiện chính của người dùng.
--   **`src/components/VideoPlayer.tsx`**: Chịu trách nhiệm hiển thị trình phát video YouTube (sử dụng `react-player`) và xử lý việc tua video đến các đoạn cụ thể.
--   **`src/components/DictationPanel.tsx`**: Là giao diện chính cho việc nghe-chép, bao gồm ô nhập liệu, các nút điều khiển (Next, Previous, Play), và hiển thị phản hồi cho người dùng.
--   **`src/components/TranscriptView.tsx`**: Hiển thị toàn bộ bản ghi của video, cho phép người dùng nhấp vào một câu bất kỳ để chuyển đến câu đó.
+- Uu tien Tailwind utility classes va component tu `frontend/src/components/ui`.
+- State toan cuc duoc quan ly trong `Index.tsx` bang React Hooks.
+- Luon chay `npm run lint` (frontend) truoc khi commit.
+- Khong commit file `.env` goc/`frontend/.env` (da duoc bo sung vao `.gitignore`).
 
-### Backend
-
--   **`main.py`**: Tệp chính của ứng dụng FastAPI.
--   **API Endpoint `/api/captions` (POST):**
-    -   Nhận một JSON body chứa `videoId`.
-    -   Gọi hàm `fetch_youtube_captions` để lấy phụ đề.
-    -   Trả về một JSON object chứa danh sách các câu (`sentences`) hoặc một lỗi (`error`).
--   **`utils/youtube_service.py`**: Module này chứa logic để tương tác với API của YouTube hoặc các thư viện bên thứ ba để lấy và xử lý phụ đề.
-
-## 6. Quy Ước và Hướng Dẫn
-
--   **Styling:** Luôn ưu tiên sử dụng các utility classes của Tailwind CSS. Đối với các thành phần phức tạp, hãy sử dụng các component từ `shadcn-ui` và tùy chỉnh chúng nếu cần.
--   **Quản lý trạng thái:** Giữ trạng thái ở thành phần cha chung gần nhất. Hiện tại, `Index.tsx` là nơi quản lý trạng thái toàn cục của ứng dụng.
--   **Thêm Component Mới:** Khi tạo một component mới, hãy đặt nó trong thư mục `src/components`. Nếu đó là một UI component có thể tái sử dụng, hãy xem xét việc thêm nó vào `src/components/ui`.
--   **Định dạng mã:** Chạy `npm run lint` để kiểm tra và sửa lỗi định dạng mã trước khi commit.
--   **Commit Messages:** Viết commit message rõ ràng, mô tả ngắn gọn những thay đổi đã thực hiện.
+Neu can bo sung API hoac tinh nang moi, vui long cap nhat lai tai lieu nay de phan anh dung kien truc hien tai.
