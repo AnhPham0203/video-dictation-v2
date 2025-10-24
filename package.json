@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "vite --port 8080",
+    "start": "vite build && vite preview",
+    "api-dev": "vercel dev"
   },
   "keywords": [],
   "author": "",
