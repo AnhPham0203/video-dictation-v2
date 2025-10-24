@@ -2,14 +2,16 @@ const YTDlpWrap = require("yt-dlp-wrap").default;
 const path = require("path");
 const os = require("os");
 
-// Khởi tạo YTDlpWrap một lần để tái sử dụng
+// Thiết lập đường dẫn cho các file thực thi
 const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path;
+YTDlpWrap.setFFmpegPath(ffmpegPath);
+
+// Khởi tạo YTDlpWrap một lần để tái sử dụng
 const ytDlpPath = path.resolve(
   __dirname,
   "../../node_modules/yt-dlp-wrap/bin/yt-dlp"
 );
 const ytDlpWrap = new YTDlpWrap(ytDlpPath);
-ytDlpWrap.setFFmpegPath(ffmpegPath);
 
 module.exports = async (req, res) => {
   // Set CORS headers cho tất cả các phản hồi
