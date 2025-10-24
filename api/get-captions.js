@@ -1,73 +1,84 @@
-const { YoutubeTranscript } = require("youtube-transcript");
+const YTDlpWrap = require("yt-dlp-wrap").default;
+const path = require("path");
+const os = require("os");
+
+// Khởi tạo YTDlpWrap một lần để tái sử dụng
+const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path;
+const ytDlpPath = path.resolve(
+  __dirname,
+  "../../node_modules/yt-dlp-wrap/bin/yt-dlp"
+);
+const ytDlpWrap = new YTDlpWrap(ytDlpPath);
+ytDlpWrap.setFFmpegPath(ffmpegPath);
 
 module.exports = async (req, res) => {
-  console.log("--- [API] Function invoked ---");
-
-  const { videoId } = req.query;
-  console.log(`--- [API] Received videoId: ${videoId} ---`);
-
-  if (!videoId) {
-    console.log("--- [API] Error: Missing videoId ---");
-    return res.status(400).json({ error: "Missing videoId query parameter" });
-  }
-
-  // Set CORS headers to allow requests from any origin for all responses
+  // Set CORS headers cho tất cả các phản hồi
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-  res.setHeader("Pragma", "no-cache");
-  res.setHeader("Expires", "0");
-  res.removeHeader?.("ETag");
-  res.removeHeader?.("Last-Modified");
-
-  // Handle preflight OPTIONS request for CORS
+  // Xử lý request OPTIONS preflight
   if (req.method === "OPTIONS") {
-    console.log("--- [API] Handling OPTIONS preflight request ---");
     return res.status(200).end();
   }
 
-  try {
-    console.log("--- [API] Attempting to fetch transcript... ---");
-    const transcript = await YoutubeTranscript.fetchTranscript(videoId, {
-      lang: "en",
-    });
-    console.log("--- [API] Transcript fetched successfully ---");
+  const { videoId } = req.query;
+  if (!videoId) {
+    return res.status(400).json({ error: "Missing videoId query parameter" });
+  }
 
-    if (!transcript || transcript.length === 0) {
-      console.log("--- [API] Warning: No transcript content found ---");
+  const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+  try {
+    console.log(`[API] Bắt đầu lấy phụ đề cho videoId: ${videoId}`);
+
+    // Lấy phụ đề dạng JSON (.srv3)
+    const metadata = await ytDlpWrap.getVideoInfo(videoUrl, [
+      "--write-auto-subs",
+      "--sub-lang",
+      "en",
+      "--sub-format",
+      "srv3",
+      "--skip-download",
+    ]);
+
+    // Kiểm tra xem phụ đề có tồn tại không
+    if (
+      !metadata.subtitles ||
+      !metadata.subtitles.en ||
+      metadata.subtitles.en.length === 0
+    ) {
+      console.log(`[API] Không tìm thấy phụ đề tiếng Anh cho: ${videoId}`);
       return res
         .status(404)
         .json({ error: "No English captions found for this video." });
     }
 
-    const sentences = transcript.map((item) => ({
-      text: item.text,
-      start: item.offset / 1000, // Convert milliseconds to seconds
-      duration: item.duration / 1000, // Convert milliseconds to seconds
-    }));
+    // Lấy dữ liệu phụ đề từ metadata (đã được yt-dlp-wrap xử lý)
+    const srv3Subtitles = metadata.subtitles.en[0].data;
+
+    // Chuyển đổi định dạng srv3 sang định dạng mà frontend cần
+    const sentences = srv3Subtitles.events.map((event) => {
+      // Bỏ các thẻ XML/HTML khỏi text
+      const cleanText = event.segs
+        .map((seg) => seg.utf8.replace(/<[^>]*>/g, ""))
+        .join(" ");
+      return {
+        text: cleanText.trim(),
+        start: event.tStartMs / 1000, // Chuyển đổi ms sang giây
+        duration: event.dDurationMs / 1000, // Chuyển đổi ms sang giây
+      };
+    });
 
     console.log(
-      `--- [API] Processed ${sentences.length} sentences. Sending response. ---`
+      `[API] Xử lý thành công ${sentences.length} câu. Gửi phản hồi.`
     );
     return res.status(200).json({ sentences });
   } catch (error) {
-    console.error("--- [API] CRITICAL ERROR ---");
-    console.error(error); // Log the full error object
-
-    let errorMessage =
-      "An unexpected error occurred while fetching the transcript.";
-    if (
-      error.message &&
-      error.message.includes("Could not find transcript for video")
-    ) {
-      errorMessage =
-        "No English captions found for this video. They may be disabled or auto-generated.";
-    }
-
-    return res
-      .status(500)
-      .json({ error: errorMessage, details: error.message });
+    console.error(`[API] LỖI NGHIÊM TRỌNG khi lấy phụ đề cho ${videoId}:`, error);
+    return res.status(500).json({
+      error: "An unexpected error occurred while fetching the transcript.",
+      details: error.message,
+    });
   }
 };

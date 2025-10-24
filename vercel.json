@@ -1,5 +1,17 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "frontend/dist",
-  "installCommand": "npm install"
+  "functions": {
+    "api/**/*.js": {
+      "includeFiles": "node_modules/yt-dlp-wrap/bin/**"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/:match*",
+      "destination": "/api/:match*"
+    },
+    {
+      "source": "/:match*",
+      "destination": "/:match*.html"
+    }
+  ]
 }
