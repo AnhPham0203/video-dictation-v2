@@ -14,8 +14,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "axios": "^1.12.2",
-    "yt-dlp-wrap": "^2.3.12"
+    "youtube-transcript": "^1.2.1"
+  },
+  "devDependencies": {
+    "vite": "^7.1.12"
   }
 }

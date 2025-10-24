@@ -1,150 +1,5 @@
-const YTDlpWrap = require("yt-dlp-wrap").default;
-const path = require("path");
-const fs = require("fs");
-const https = require("https");
-const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path;
-
-process.env.FFMPEG_PATH = ffmpegPath;
-
-const downloadYtDlp = async () => {
-  // Use /tmp directory for Vercel, fallback to current directory
-  const tmpDir = process.env.VERCEL ? "/tmp" : "./tmp";
-  const ytDlpPath = path.join(tmpDir, "yt-dlp");
-  
-  // Ensure tmp directory exists
-  if (!fs.existsSync(tmpDir)) {
-    fs.mkdirSync(tmpDir, { recursive: true });
-  }
-  
-  if (fs.existsSync(ytDlpPath)) {
-    try {
-      fs.chmodSync(ytDlpPath, 0o755);
-    } catch (e) {
-      console.log("Could not set permissions, continuing...");
-    }
-    return ytDlpPath;
-  }
-
-  console.log("Downloading yt-dlp binary...");
-  
-  return new Promise((resolve, reject) => {
-    const file = fs.createWriteStream(ytDlpPath);
-    const url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp";
-    
-    https.get(url, { timeout: 30000 }, (response) => {
-      if (response.statusCode === 302 || response.statusCode === 301) {
-        https.get(response.headers.location, (redirectResponse) => {
-          redirectResponse.pipe(file);
-          file.on("finish", () => {
-            file.close();
-            try {
-              fs.chmodSync(ytDlpPath, 0o755);
-            } catch (e) {
-              console.log("Could not set permissions, continuing...");
-            }
-            console.log("yt-dlp downloaded successfully");
-            resolve(ytDlpPath);
-          });
-        }).on("error", reject);
-      } else {
-        response.pipe(file);
-        file.on("finish", () => {
-          file.close();
-          try {
-            fs.chmodSync(ytDlpPath, 0o755);
-          } catch (e) {
-            console.log("Could not set permissions, continuing...");
-          }
-          console.log("yt-dlp downloaded successfully");
-          resolve(ytDlpPath);
-        });
-      }
-    }).on("error", reject);
-  });
-};
-
-const parseSubtitleFile = (filePath) => {
-  if (!fs.existsSync(filePath)) {
-    return null;
-  }
-
-  const content = fs.readFileSync(filePath, "utf-8");
-  
-  try {
-    // Thử parse JSON (srv3 hoặc json3)
-    const json = JSON.parse(content);
-    if (json.events) {
-      return json.events.map((event) => {
-        const clean = event.segs
-          ?.map((seg) => seg.utf8.replace(/<[^>]*>/g, ""))
-          .join(" ");
-        return {
-          text: clean?.trim() || "",
-          start: event.tStartMs / 1000,
-          duration: event.dDurationMs / 1000,
-        };
-      });
-    }
-  } catch (e) {
-    // Không phải JSON, thử parse VTT
-    if (content.includes("WEBVTT")) {
-      const lines = content.split("\n");
-      const sentences = [];
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].includes("-->")) {
-          const timeParts = lines[i].split(" --> ");
-          const text = lines[i + 1]?.trim();
-          if (text && timeParts.length === 2) {
-            const timeToSeconds = (timeStr) => {
-              const parts = timeStr.trim().split(":");
-              return (
-                parseInt(parts[0]) * 3600 +
-                parseInt(parts[1]) * 60 +
-                parseFloat(parts[2])
-              );
-            };
-            sentences.push({
-              text,
-              start: timeToSeconds(timeParts[0]),
-              duration: timeToSeconds(timeParts[1]) - timeToSeconds(timeParts[0]),
-            });
-          }
-        }
-      }
-      return sentences.length > 0 ? sentences : null;
-    }
-    
-    // Thử parse SRT
-    const blocks = content.split(/\n\n+/);
-    const sentences = [];
-    for (const block of blocks) {
-      const lines = block.trim().split("\n");
-      if (lines.length >= 3) {
-        const timeLine = lines[1];
-        const text = lines.slice(2).join("\n");
-        const timeParts = timeLine.split(" --> ");
-        if (timeParts.length === 2) {
-          const timeToSeconds = (timeStr) => {
-            const parts = timeStr.trim().split(":");
-            return (
-              parseInt(parts[0]) * 3600 +
-              parseInt(parts[1]) * 60 +
-              parseFloat(parts[2].replace(",", "."))
-            );
-          };
-          sentences.push({
-            text: text.trim(),
-            start: timeToSeconds(timeParts[0]),
-            duration: timeToSeconds(timeParts[1]) - timeToSeconds(timeParts[0]),
-          });
-        }
-      }
-    }
-    return sentences.length > 0 ? sentences : null;
-  }
-
-  return null;
-};
+// Version mới sử dụng youtube-transcript package (nhẹ hơn, không cần binary)
+const { YoutubeTranscript } = require('youtube-transcript');
 
 module.exports = async (req, res) => {
   console.log("API called with method:", req.method);
@@ -162,122 +17,85 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: "Missing videoId" });
   }
 
-  const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-  console.log("Processing video URL:", videoUrl);
+  console.log("Fetching transcript for video:", videoId);
 
   try {
-    console.log("Starting yt-dlp download...");
-    const ytDlpPath = await downloadYtDlp();
-    console.log("yt-dlp path:", ytDlpPath);
+    // Thử lấy phụ đề tiếng Anh trước
+    let transcriptData = null;
+    let language = 'en';
     
-    const ytDlpWrap = new YTDlpWrap(ytDlpPath);
-    const outputDir = process.env.VERCEL ? "/tmp" : "./tmp";
-    const outputTemplate = path.join(outputDir, "%(id)s.%(lang)s.%(ext)s");
-    
-    console.log("Output directory:", outputDir);
-    console.log("Output template:", outputTemplate);
-
-    // ✅ BƯỚC 1: Chạy thực tế để tải phụ đề (không chỉ metadata)
-    console.log("Downloading subtitles for:", videoId);
     try {
-      await ytDlpWrap.execPromise([
-        videoUrl,
-        "--write-subs",
-        "--write-auto-subs",
-        "--skip-download",
-        "--sub-lang",
-        "en,en-US,en-GB,vi,ja,ko,zh-Hans,zh-Hant,es,pt,fr",
-        "--sub-format",
-        "srv3/vtt/srt/json3",
-        "-o",
-        outputTemplate,
-      ]);
-      console.log("yt-dlp execution completed successfully");
-    } catch (execError) {
-      console.error("yt-dlp execution failed:", execError);
-      // Continue to try getting metadata even if subtitle download fails
-    }
-
-    // ✅ BƯỚC 2: Lấy metadata để biết video ID chính xác
-    console.log("Getting video metadata...");
-    let metadata;
-    try {
-      metadata = await ytDlpWrap.getVideoInfo(videoUrl);
-      console.log("Metadata retrieved successfully");
-    } catch (metadataError) {
-      console.error("Failed to get video metadata:", metadataError);
-      return res.status(500).json({
-        error: "Failed to retrieve video information.",
-        details: metadataError.message,
+      // Thử English trước
+      transcriptData = await YoutubeTranscript.fetchTranscript(videoId, {
+        lang: 'en',
       });
-    }
-    
-    const actualVideoId = metadata.id || videoId;
-    console.log("Actual video ID:", actualVideoId);
-    console.log("Available subtitle languages:", Object.keys(metadata.subtitles || {}));
-
-    if (!metadata.subtitles || Object.keys(metadata.subtitles).length === 0) {
-      return res.status(404).json({
-        error: "No subtitles found for this video.",
-        videoId: actualVideoId,
-      });
-    }
-
-    // ✅ BƯỚC 3: Ưu tiên ngôn ngữ: en > vi > bất kỳ ngôn ngữ nào
-    let selectedSentences = null;
-    let selectedLang = null;
-    let selectedFormat = null;
-
-    for (const lang of ["en", "vi", "ja", "ko", "zh-Hans", "zh-Hant", "es", "pt", "fr"]) {
-      if (metadata.subtitles[lang]) {
-        selectedLang = lang;
-        console.log(`Found subtitles in language: ${lang}`);
-
-        // Thử các format theo thứ tự ưu tiên
-        for (const format of ["srv3", "vtt", "srt", "json3"]) {
-          const subtitleInfo = metadata.subtitles[lang].find((s) => s.ext === format);
-          if (subtitleInfo) {
-            selectedFormat = format;
-            const filePath = path.join(outputDir, `${actualVideoId}.${lang}.${format}`);
-            console.log(`Trying to read: ${filePath}`);
-
-            selectedSentences = parseSubtitleFile(filePath);
-            if (selectedSentences && selectedSentences.length > 0) {
-              console.log(`Successfully parsed ${selectedSentences.length} subtitles from ${format}`);
-              break;
-            }
-          }
-        }
-
-        if (selectedSentences && selectedSentences.length > 0) {
-          break;
-        }
+      language = 'en';
+      console.log("Found English subtitles");
+    } catch (enError) {
+      console.log("English not found, trying Vietnamese...");
+      try {
+        // Nếu không có English, thử Vietnamese
+        transcriptData = await YoutubeTranscript.fetchTranscript(videoId, {
+          lang: 'vi',
+        });
+        language = 'vi';
+        console.log("Found Vietnamese subtitles");
+      } catch (viError) {
+        console.log("Vietnamese not found, trying auto-generated...");
+        // Nếu không có cả 2, lấy bất kỳ ngôn ngữ nào có
+        transcriptData = await YoutubeTranscript.fetchTranscript(videoId);
+        language = 'auto';
+        console.log("Using auto-generated subtitles");
       }
     }
 
-    if (!selectedSentences || selectedSentences.length === 0) {
+    if (!transcriptData || transcriptData.length === 0) {
       return res.status(404).json({
-        error: "Failed to parse subtitles from downloaded files.",
-        availableLanguages: Object.keys(metadata.subtitles),
-        videoId: actualVideoId,
+        error: "No subtitles found for this video.",
+        videoId: videoId,
       });
     }
 
-    // ✅ BƯỚC 4: Trả về kết quả
+    // Chuyển đổi format để match với format cũ
+    const sentences = transcriptData.map((item) => ({
+      text: item.text,
+      start: item.offset / 1000, // Chuyển từ ms sang seconds
+      duration: item.duration / 1000, // Chuyển từ ms sang seconds
+    }));
+
+    console.log(`Successfully fetched ${sentences.length} subtitle entries`);
+
     return res.status(200).json({
       success: true,
-      sentences: selectedSentences,
-      language: selectedLang,
-      format: selectedFormat,
-      count: selectedSentences.length,
-      videoId: actualVideoId,
+      sentences: sentences,
+      language: language,
+      format: 'json',
+      count: sentences.length,
+      videoId: videoId,
     });
 
   } catch (error) {
-    console.error("Error fetching captions:", error);
+    console.error("Error fetching transcript:", error);
+    
+    // Kiểm tra các lỗi cụ thể
+    if (error.message && error.message.includes('Transcript is disabled')) {
+      return res.status(404).json({
+        error: "Subtitles are disabled for this video.",
+        videoId: videoId,
+      });
+    }
+    
+    if (error.message && error.message.includes('No transcripts available')) {
+      return res.status(404).json({
+        error: "No subtitles found for this video.",
+        videoId: videoId,
+      });
+    }
+
     return res.status(500).json({
       error: "An unexpected error occurred while fetching the transcript.",
       details: error.message,
     });
   }
 };
+
