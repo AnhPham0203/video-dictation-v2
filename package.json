@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite --port 8080",
     "start": "vite build && vite preview",
-    "api-dev": "vercel dev"
+    "api-dev": "vercel dev",
+    "build": "cd frontend && npm run build",
+    "postinstall": "cd frontend && npm install"
   },
   "keywords": [],
   "author": "",
