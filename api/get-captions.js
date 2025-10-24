@@ -7,10 +7,21 @@ const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path;
 process.env.FFMPEG_PATH = ffmpegPath;
 
 const downloadYtDlp = async () => {
-  const ytDlpPath = "/tmp/yt-dlp";
+  // Use /tmp directory for Vercel, fallback to current directory
+  const tmpDir = process.env.VERCEL ? "/tmp" : "./tmp";
+  const ytDlpPath = path.join(tmpDir, "yt-dlp");
+  
+  // Ensure tmp directory exists
+  if (!fs.existsSync(tmpDir)) {
+    fs.mkdirSync(tmpDir, { recursive: true });
+  }
   
   if (fs.existsSync(ytDlpPath)) {
-    fs.chmodSync(ytDlpPath, 0o755);
+    try {
+      fs.chmodSync(ytDlpPath, 0o755);
+    } catch (e) {
+      console.log("Could not set permissions, continuing...");
+    }
     return ytDlpPath;
   }
 
@@ -26,7 +37,11 @@ const downloadYtDlp = async () => {
           redirectResponse.pipe(file);
           file.on("finish", () => {
             file.close();
-            fs.chmodSync(ytDlpPath, 0o755);
+            try {
+              fs.chmodSync(ytDlpPath, 0o755);
+            } catch (e) {
+              console.log("Could not set permissions, continuing...");
+            }
             console.log("yt-dlp downloaded successfully");
             resolve(ytDlpPath);
           });
@@ -35,7 +50,11 @@ const downloadYtDlp = async () => {
         response.pipe(file);
         file.on("finish", () => {
           file.close();
-          fs.chmodSync(ytDlpPath, 0o755);
+          try {
+            fs.chmodSync(ytDlpPath, 0o755);
+          } catch (e) {
+            console.log("Could not set permissions, continuing...");
+          }
           console.log("yt-dlp downloaded successfully");
           resolve(ytDlpPath);
         });
@@ -128,6 +147,9 @@ const parseSubtitleFile = (filePath) => {
 };
 
 module.exports = async (req, res) => {
+  console.log("API called with method:", req.method);
+  console.log("Query params:", req.query);
+  
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -135,35 +157,63 @@ module.exports = async (req, res) => {
   if (req.method === "OPTIONS") return res.status(200).end();
 
   const { videoId } = req.query;
-  if (!videoId) return res.status(400).json({ error: "Missing videoId" });
+  if (!videoId) {
+    console.log("Missing videoId parameter");
+    return res.status(400).json({ error: "Missing videoId" });
+  }
 
   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  console.log("Processing video URL:", videoUrl);
 
   try {
+    console.log("Starting yt-dlp download...");
     const ytDlpPath = await downloadYtDlp();
+    console.log("yt-dlp path:", ytDlpPath);
+    
     const ytDlpWrap = new YTDlpWrap(ytDlpPath);
-    const outputDir = "/tmp";
+    const outputDir = process.env.VERCEL ? "/tmp" : "./tmp";
     const outputTemplate = path.join(outputDir, "%(id)s.%(lang)s.%(ext)s");
+    
+    console.log("Output directory:", outputDir);
+    console.log("Output template:", outputTemplate);
 
     // ✅ BƯỚC 1: Chạy thực tế để tải phụ đề (không chỉ metadata)
     console.log("Downloading subtitles for:", videoId);
-    await ytDlpWrap.execPromise([
-      videoUrl,
-      "--write-subs",
-      "--write-auto-subs",
-      "--skip-download",
-      "--sub-lang",
-      "en,en-US,en-GB,vi,ja,ko,zh-Hans,zh-Hant,es,pt,fr",
-      "--sub-format",
-      "srv3/vtt/srt/json3",
-      "-o",
-      outputTemplate,
-    ]);
+    try {
+      await ytDlpWrap.execPromise([
+        videoUrl,
+        "--write-subs",
+        "--write-auto-subs",
+        "--skip-download",
+        "--sub-lang",
+        "en,en-US,en-GB,vi,ja,ko,zh-Hans,zh-Hant,es,pt,fr",
+        "--sub-format",
+        "srv3/vtt/srt/json3",
+        "-o",
+        outputTemplate,
+      ]);
+      console.log("yt-dlp execution completed successfully");
+    } catch (execError) {
+      console.error("yt-dlp execution failed:", execError);
+      // Continue to try getting metadata even if subtitle download fails
+    }
 
     // ✅ BƯỚC 2: Lấy metadata để biết video ID chính xác
-    const metadata = await ytDlpWrap.getVideoInfo(videoUrl);
-    const actualVideoId = metadata.id || videoId;
+    console.log("Getting video metadata...");
+    let metadata;
+    try {
+      metadata = await ytDlpWrap.getVideoInfo(videoUrl);
+      console.log("Metadata retrieved successfully");
+    } catch (metadataError) {
+      console.error("Failed to get video metadata:", metadataError);
+      return res.status(500).json({
+        error: "Failed to retrieve video information.",
+        details: metadataError.message,
+      });
+    }
     
+    const actualVideoId = metadata.id || videoId;
+    console.log("Actual video ID:", actualVideoId);
     console.log("Available subtitle languages:", Object.keys(metadata.subtitles || {}));
 
     if (!metadata.subtitles || Object.keys(metadata.subtitles).length === 0) {
