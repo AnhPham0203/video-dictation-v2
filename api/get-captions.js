@@ -1,12 +1,13 @@
 const YTDlpWrap = require("yt-dlp-wrap").default;
 const path = require("path");
-const os = require("os");
 
-// Thiết lập đường dẫn cho các file thực thi
+// Import ffmpeg-static để có đường dẫn ffmpeg hợp lệ
 const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path;
-YTDlpWrap.setFFmpegPath(ffmpegPath);
 
-// Khởi tạo YTDlpWrap một lần để tái sử dụng
+// Thiết lập ffmpeg path qua biến môi trường (đây là cách đúng)
+process.env.FFMPEG_PATH = ffmpegPath;
+
+// Khởi tạo yt-dlp binary path
 const ytDlpPath = path.resolve(
   __dirname,
   "../../node_modules/yt-dlp-wrap/bin/yt-dlp"
@@ -14,12 +15,11 @@ const ytDlpPath = path.resolve(
 const ytDlpWrap = new YTDlpWrap(ytDlpPath);
 
 module.exports = async (req, res) => {
-  // Set CORS headers cho tất cả các phản hồi
+  // CORS headers
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  // Xử lý request OPTIONS preflight
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -32,9 +32,9 @@ module.exports = async (req, res) => {
   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
   try {
-    console.log(`[API] Bắt đầu lấy phụ đề cho videoId: ${videoId}`);
+    console.log(`[API] Fetching subtitles for: ${videoId}`);
 
-    // Lấy phụ đề dạng JSON (.srv3)
+    // Lấy metadata của video
     const metadata = await ytDlpWrap.getVideoInfo(videoUrl, [
       "--write-auto-subs",
       "--sub-lang",
@@ -44,40 +44,36 @@ module.exports = async (req, res) => {
       "--skip-download",
     ]);
 
-    // Kiểm tra xem phụ đề có tồn tại không
     if (
       !metadata.subtitles ||
       !metadata.subtitles.en ||
       metadata.subtitles.en.length === 0
     ) {
-      console.log(`[API] Không tìm thấy phụ đề tiếng Anh cho: ${videoId}`);
+      console.log(`[API] No English captions found for: ${videoId}`);
       return res
         .status(404)
         .json({ error: "No English captions found for this video." });
     }
 
-    // Lấy dữ liệu phụ đề từ metadata (đã được yt-dlp-wrap xử lý)
+    // Lấy dữ liệu phụ đề
     const srv3Subtitles = metadata.subtitles.en[0].data;
 
-    // Chuyển đổi định dạng srv3 sang định dạng mà frontend cần
+    // Convert srv3 → text
     const sentences = srv3Subtitles.events.map((event) => {
-      // Bỏ các thẻ XML/HTML khỏi text
       const cleanText = event.segs
-        .map((seg) => seg.utf8.replace(/<[^>]*>/g, ""))
+        ?.map((seg) => seg.utf8.replace(/<[^>]*>/g, ""))
         .join(" ");
       return {
-        text: cleanText.trim(),
-        start: event.tStartMs / 1000, // Chuyển đổi ms sang giây
-        duration: event.dDurationMs / 1000, // Chuyển đổi ms sang giây
+        text: cleanText?.trim() || "",
+        start: event.tStartMs / 1000,
+        duration: event.dDurationMs / 1000,
       };
     });
 
-    console.log(
-      `[API] Xử lý thành công ${sentences.length} câu. Gửi phản hồi.`
-    );
+    console.log(`[API] Successfully processed ${sentences.length} sentences.`);
     return res.status(200).json({ sentences });
   } catch (error) {
-    console.error(`[API] LỖI NGHIÊM TRỌNG khi lấy phụ đề cho ${videoId}:`, error);
+    console.error(`[API] Error while fetching subtitles:`, error);
     return res.status(500).json({
       error: "An unexpected error occurred while fetching the transcript.",
       details: error.message,
