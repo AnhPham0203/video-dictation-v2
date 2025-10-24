@@ -1,4 +1,4 @@
-const { YouTubeTranscript } = require("youtube-transcript");
+const { YoutubeTranscript } = require("youtube-transcript");
 
 module.exports = async (req, res) => {
   console.log("--- [API] Function invoked ---");
@@ -30,7 +30,7 @@ module.exports = async (req, res) => {
 
   try {
     console.log("--- [API] Attempting to fetch transcript... ---");
-    const transcript = await YouTubeTranscript.fetchTranscript(videoId, {
+    const transcript = await YoutubeTranscript.fetchTranscript(videoId, {
       lang: "en",
     });
     console.log("--- [API] Transcript fetched successfully ---");
