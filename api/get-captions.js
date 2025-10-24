@@ -143,7 +143,7 @@ module.exports = async (req, res) => {
     const ytDlpPath = await downloadYtDlp();
     const ytDlpWrap = new YTDlpWrap(ytDlpPath);
     const outputDir = "/tmp";
-    const outputTemplate = path.join(outputDir, "%(id)s.%(ext)s");
+    const outputTemplate = path.join(outputDir, "%(id)s.%(lang)s.%(ext)s");
 
     // ✅ BƯỚC 1: Chạy thực tế để tải phụ đề (không chỉ metadata)
     console.log("Downloading subtitles for:", videoId);
