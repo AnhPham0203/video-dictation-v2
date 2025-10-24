@@ -44,6 +44,89 @@ const downloadYtDlp = async () => {
   });
 };
 
+const parseSubtitleFile = (filePath) => {
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+
+  const content = fs.readFileSync(filePath, "utf-8");
+  
+  try {
+    // Thử parse JSON (srv3 hoặc json3)
+    const json = JSON.parse(content);
+    if (json.events) {
+      return json.events.map((event) => {
+        const clean = event.segs
+          ?.map((seg) => seg.utf8.replace(/<[^>]*>/g, ""))
+          .join(" ");
+        return {
+          text: clean?.trim() || "",
+          start: event.tStartMs / 1000,
+          duration: event.dDurationMs / 1000,
+        };
+      });
+    }
+  } catch (e) {
+    // Không phải JSON, thử parse VTT
+    if (content.includes("WEBVTT")) {
+      const lines = content.split("\n");
+      const sentences = [];
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].includes("-->")) {
+          const timeParts = lines[i].split(" --> ");
+          const text = lines[i + 1]?.trim();
+          if (text && timeParts.length === 2) {
+            const timeToSeconds = (timeStr) => {
+              const parts = timeStr.trim().split(":");
+              return (
+                parseInt(parts[0]) * 3600 +
+                parseInt(parts[1]) * 60 +
+                parseFloat(parts[2])
+              );
+            };
+            sentences.push({
+              text,
+              start: timeToSeconds(timeParts[0]),
+              duration: timeToSeconds(timeParts[1]) - timeToSeconds(timeParts[0]),
+            });
+          }
+        }
+      }
+      return sentences.length > 0 ? sentences : null;
+    }
+    
+    // Thử parse SRT
+    const blocks = content.split(/\n\n+/);
+    const sentences = [];
+    for (const block of blocks) {
+      const lines = block.trim().split("\n");
+      if (lines.length >= 3) {
+        const timeLine = lines[1];
+        const text = lines.slice(2).join("\n");
+        const timeParts = timeLine.split(" --> ");
+        if (timeParts.length === 2) {
+          const timeToSeconds = (timeStr) => {
+            const parts = timeStr.trim().split(":");
+            return (
+              parseInt(parts[0]) * 3600 +
+              parseInt(parts[1]) * 60 +
+              parseFloat(parts[2].replace(",", "."))
+            );
+          };
+          sentences.push({
+            text: text.trim(),
+            start: timeToSeconds(timeParts[0]),
+            duration: timeToSeconds(timeParts[1]) - timeToSeconds(timeParts[0]),
+          });
+        }
+      }
+    }
+    return sentences.length > 0 ? sentences : null;
+  }
+
+  return null;
+};
+
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
@@ -59,109 +142,87 @@ module.exports = async (req, res) => {
   try {
     const ytDlpPath = await downloadYtDlp();
     const ytDlpWrap = new YTDlpWrap(ytDlpPath);
+    const outputDir = "/tmp";
+    const outputTemplate = path.join(outputDir, "%(id)s.%(ext)s");
 
-    const metadata = await ytDlpWrap.getVideoInfo(videoUrl, [
+    // ✅ BƯỚC 1: Chạy thực tế để tải phụ đề (không chỉ metadata)
+    console.log("Downloading subtitles for:", videoId);
+    await ytDlpWrap.execPromise([
+      videoUrl,
+      "--write-subs",
       "--write-auto-subs",
-      "--sub-lang",
-      "en,vi,ja,ko,pt,es,fr",
-      "--sub-format",
-      "srv3/vtt/srt",
       "--skip-download",
+      "--sub-lang",
+      "en,en-US,en-GB,vi,ja,ko,zh-Hans,zh-Hant,es,pt,fr",
+      "--sub-format",
+      "srv3/vtt/srt/json3",
+      "-o",
+      outputTemplate,
     ]);
 
-    console.log("Available subtitles:", Object.keys(metadata.subtitles || {}));
+    // ✅ BƯỚC 2: Lấy metadata để biết video ID chính xác
+    const metadata = await ytDlpWrap.getVideoInfo(videoUrl);
+    const actualVideoId = metadata.id || videoId;
+    
+    console.log("Available subtitle languages:", Object.keys(metadata.subtitles || {}));
 
-    // Kiểm tra các ngôn ngữ khả dụng
     if (!metadata.subtitles || Object.keys(metadata.subtitles).length === 0) {
       return res.status(404).json({
         error: "No subtitles found for this video.",
-        videoId,
+        videoId: actualVideoId,
       });
     }
 
-    // Ưu tiên: en > vi > bất kỳ ngôn ngữ nào khác
-    let subtitleData = null;
-    let lang = null;
+    // ✅ BƯỚC 3: Ưu tiên ngôn ngữ: en > vi > bất kỳ ngôn ngữ nào
+    let selectedSentences = null;
+    let selectedLang = null;
+    let selectedFormat = null;
 
-    for (const language of ["en", "vi", "ja", "ko", "pt", "es", "fr"]) {
-      if (metadata.subtitles[language]) {
-        lang = language;
-        // Thử srv3 trước, nếu không có thì thử vtt
-        const srv3Sub = metadata.subtitles[language].find(
-          (sub) => sub.ext === "srv3"
-        );
-        const vttSub = metadata.subtitles[language].find(
-          (sub) => sub.ext === "vtt"
-        );
-        const srtSub = metadata.subtitles[language].find(
-          (sub) => sub.ext === "srt"
-        );
+    for (const lang of ["en", "vi", "ja", "ko", "zh-Hans", "zh-Hant", "es", "pt", "fr"]) {
+      if (metadata.subtitles[lang]) {
+        selectedLang = lang;
+        console.log(`Found subtitles in language: ${lang}`);
 
-        subtitleData = srv3Sub || vttSub || srtSub;
-        if (subtitleData) break;
-      }
-    }
+        // Thử các format theo thứ tự ưu tiên
+        for (const format of ["srv3", "vtt", "srt", "json3"]) {
+          const subtitleInfo = metadata.subtitles[lang].find((s) => s.ext === format);
+          if (subtitleInfo) {
+            selectedFormat = format;
+            const filePath = path.join(outputDir, `${actualVideoId}.${lang}.${format}`);
+            console.log(`Trying to read: ${filePath}`);
 
-    if (!subtitleData) {
-      return res.status(404).json({
-        error: "No subtitles in supported formats found.",
-        availableLanguages: Object.keys(metadata.subtitles),
-      });
-    }
-
-    console.log(`Using ${lang} subtitles in ${subtitleData.ext} format`);
-
-    let sentences = [];
-
-    // Xử lý srv3 format
-    if (subtitleData.ext === "srv3" && subtitleData.data) {
-      const srv3 = subtitleData.data;
-      sentences = srv3.events.map((event) => {
-        const clean = event.segs
-          ?.map((seg) => seg.utf8.replace(/<[^>]*>/g, ""))
-          .join(" ");
-        return {
-          text: clean?.trim() || "",
-          start: event.tStartMs / 1000,
-          duration: event.dDurationMs / 1000,
-        };
-      });
-    }
-    // Xử lý VTT format
-    else if (subtitleData.ext === "vtt" && subtitleData.data) {
-      const vttContent = subtitleData.data;
-      const lines = vttContent.split("\n");
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].includes("-->")) {
-          const timeParts = lines[i].split(" --> ");
-          const text = lines[i + 1];
-          if (text && timeParts.length === 2) {
-            sentences.push({
-              text: text.trim(),
-              start: parseFloat(timeParts[0].replace(/:/g, ".").split(".")[0]) * 3600 +
-                     parseFloat(timeParts[0].replace(/:/g, ".").split(".")[1]) * 60 +
-                     parseFloat(timeParts[0].replace(/:/g, ".").split(".")[2]),
-              duration: 0,
-            });
+            selectedSentences = parseSubtitleFile(filePath);
+            if (selectedSentences && selectedSentences.length > 0) {
+              console.log(`Successfully parsed ${selectedSentences.length} subtitles from ${format}`);
+              break;
+            }
           }
+        }
+
+        if (selectedSentences && selectedSentences.length > 0) {
+          break;
         }
       }
     }
 
-    if (sentences.length === 0) {
+    if (!selectedSentences || selectedSentences.length === 0) {
       return res.status(404).json({
-        error: "No subtitle content found.",
-        lang,
-        format: subtitleData.ext,
+        error: "Failed to parse subtitles from downloaded files.",
+        availableLanguages: Object.keys(metadata.subtitles),
+        videoId: actualVideoId,
       });
     }
 
+    // ✅ BƯỚC 4: Trả về kết quả
     return res.status(200).json({
-      sentences,
-      language: lang,
-      format: subtitleData.ext,
-      count: sentences.length,
+      success: true,
+      sentences: selectedSentences,
+      language: selectedLang,
+      format: selectedFormat,
+      count: selectedSentences.length,
+      videoId: actualVideoId,
     });
+
   } catch (error) {
     console.error("Error fetching captions:", error);
     return res.status(500).json({
