@@ -1,7 +1,8 @@
 {
   "functions": {
     "api/**/*.js": {
-      "includeFiles": "node_modules/yt-dlp-wrap/bin/**"
+      "maxDuration": 30,
+      "memory": 1024
     }
   },
   "rewrites": [

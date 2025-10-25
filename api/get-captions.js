@@ -1,14 +1,14 @@
-// Version mới sử dụng youtube-transcript package (nhẹ hơn, không cần binary)
-const { YoutubeTranscript } = require('youtube-transcript');
+// Using youtubei.js - stable official YouTube library
+const { Innertube } = require("youtubei.js");
 
 module.exports = async (req, res) => {
   console.log("API called with method:", req.method);
   console.log("Query params:", req.query);
-  
+
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  
+
   if (req.method === "OPTIONS") return res.status(200).end();
 
   const { videoId } = req.query;
@@ -20,74 +20,88 @@ module.exports = async (req, res) => {
   console.log("Fetching transcript for video:", videoId);
 
   try {
-    // Thử lấy phụ đề tiếng Anh trước
-    let transcriptData = null;
-    let language = 'en';
-    
-    try {
-      // Thử English trước
-      transcriptData = await YoutubeTranscript.fetchTranscript(videoId, {
-        lang: 'en',
-      });
-      language = 'en';
-      console.log("Found English subtitles");
-    } catch (enError) {
-      console.log("English not found, trying Vietnamese...");
-      try {
-        // Nếu không có English, thử Vietnamese
-        transcriptData = await YoutubeTranscript.fetchTranscript(videoId, {
-          lang: 'vi',
-        });
-        language = 'vi';
-        console.log("Found Vietnamese subtitles");
-      } catch (viError) {
-        console.log("Vietnamese not found, trying auto-generated...");
-        // Nếu không có cả 2, lấy bất kỳ ngôn ngữ nào có
-        transcriptData = await YoutubeTranscript.fetchTranscript(videoId);
-        language = 'auto';
-        console.log("Using auto-generated subtitles");
-      }
-    }
+    // Create Innertube instance
+    const youtube = await Innertube.create({
+      cache: undefined, // Disable cache for serverless
+    });
 
-    if (!transcriptData || transcriptData.length === 0) {
+    // Get video info
+    const info = await youtube.getInfo(videoId);
+
+    // Get transcript data
+    const transcriptData = await info.getTranscript();
+
+    if (!transcriptData) {
       return res.status(404).json({
         error: "No subtitles found for this video.",
         videoId: videoId,
       });
     }
 
-    // Chuyển đổi format để match với format cũ
-    const sentences = transcriptData.map((item) => ({
-      text: item.text,
-      start: item.offset / 1000, // Chuyển từ ms sang seconds
-      duration: item.duration / 1000, // Chuyển từ ms sang seconds
+    // Extract segments with proper null checks
+    const segments = transcriptData.transcript?.content?.body?.initial_segments;
+
+    if (!segments || !Array.isArray(segments)) {
+      return res.status(404).json({
+        error: "No subtitle content available for this video.",
+        videoId: videoId,
+      });
+    }
+
+    // Map to frontend-compatible format
+    const sentences = segments.map((segment) => ({
+      text: (segment.snippet?.text || "").trim(),
+      start: (segment.start_ms || 0) / 1000, // Convert ms to seconds
+      duration: ((segment.end_ms || 0) - (segment.start_ms || 0)) / 1000, // Convert ms to seconds
     }));
 
-    console.log(`Successfully fetched ${sentences.length} subtitle entries`);
+    // Filter out empty texts
+    const validSentences = sentences.filter((s) => s.text.length > 0);
+
+    if (validSentences.length === 0) {
+      return res.status(404).json({
+        error: "No subtitle content available for this video.",
+        videoId: videoId,
+      });
+    }
+
+    console.log(
+      `Successfully fetched ${validSentences.length} subtitle entries`
+    );
 
     return res.status(200).json({
       success: true,
-      sentences: sentences,
-      language: language,
-      format: 'json',
-      count: sentences.length,
+      sentences: validSentences,
+      language: "en", // youtubei.js gets default language
+      format: "json",
+      count: validSentences.length,
       videoId: videoId,
     });
-
   } catch (error) {
     console.error("Error fetching transcript:", error);
-    
-    // Kiểm tra các lỗi cụ thể
-    if (error.message && error.message.includes('Transcript is disabled')) {
+
+    // Handle specific errors
+    if (error.message && error.message.includes("Transcript is disabled")) {
       return res.status(404).json({
         error: "Subtitles are disabled for this video.",
         videoId: videoId,
       });
     }
-    
-    if (error.message && error.message.includes('No transcripts available')) {
+
+    if (
+      error.message &&
+      (error.message.includes("not available") ||
+        error.message.includes("unavailable"))
+    ) {
       return res.status(404).json({
-        error: "No subtitles found for this video.",
+        error: "Video is unavailable or restricted.",
+        videoId: videoId,
+      });
+    }
+
+    if (error.message && error.message.includes("age-gated")) {
+      return res.status(404).json({
+        error: "Video is age-restricted and cannot be accessed.",
         videoId: videoId,
       });
     }
@@ -98,4 +112,3 @@ module.exports = async (req, res) => {
     });
   }
 };
-
