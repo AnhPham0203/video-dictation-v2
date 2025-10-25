@@ -78,22 +78,26 @@ All colors MUST be HSL.
 
 .transcript-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+  scrollbar-color: hsl(217 91% 60% / 0.5) hsl(215 28% 20%);
 }
 
 .transcript-scrollbar::-webkit-scrollbar {
-  width: 8px;
+  width: 12px;
 }
 
 .transcript-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
+  background: hsl(215 28% 17%);
+  border-radius: 999px;
+  margin: 8px 0;
 }
 
 .transcript-scrollbar::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.4);
+  background: hsl(217 91% 60% / 0.5);
+  border: 3px solid hsl(215 28% 17%);
+  transition: background 0.2s;
 }
 
 .transcript-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.6);
+  background: hsl(217 91% 60% / 0.7);
 }

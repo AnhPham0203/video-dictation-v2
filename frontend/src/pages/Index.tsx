@@ -552,11 +552,11 @@ const Index = () => {
 
       {/* Main Content */}
 
-      <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:min-h-[calc(100vh-140px)]">
+      <div className="container mx-auto px-4 py-6 h-[calc(100vh-140px)]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
           {/* Left: Video Player */}
 
-          <div className="relative flex flex-col gap-4">
+          <div className="relative flex flex-col gap-4 min-h-0">
             <VideoPlayer
               videoUrl={videoUrl}
               seekTo={seekTo}
@@ -614,11 +614,11 @@ const Index = () => {
 
           {/* Right: Dictation/Transcript Panel */}
 
-          <div className="flex flex-col flex-1 min-h-0">
+          <div className="flex flex-col min-h-0 h-full">
             <Tabs
               value={currentTab}
               onValueChange={setCurrentTab}
-              className="flex flex-col flex-1 min-h-0"
+              className="flex flex-col h-full"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -715,7 +715,7 @@ const Index = () => {
 
               <TabsContent
                 value="transcript"
-                className="mt-4 flex-1 min-h-0 overflow-hidden"
+                className="mt-4 h-[calc(100%-80px)] data-[state=active]:flex data-[state=active]:flex-col"
               >
                 <TranscriptView
                   sentences={sentences}

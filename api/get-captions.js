@@ -20,6 +20,19 @@ module.exports = async (req, res) => {
   console.log("Fetching transcript for video:", videoId);
 
   try {
+    // Suppress youtubei.js parser warnings (they don't affect transcript fetching)
+    const originalConsoleError = console.error;
+    console.error = (...args) => {
+      // Only suppress ParsingError warnings, keep other errors
+      if (
+        args[0]?.includes?.("[YOUTUBEJS][Parser]: ParsingError") ||
+        args[0]?.stack?.includes?.("ParsingError")
+      ) {
+        return; // Suppress
+      }
+      originalConsoleError(...args);
+    };
+
     // Create Innertube instance
     const youtube = await Innertube.create({
       cache: undefined, // Disable cache for serverless
@@ -69,6 +82,9 @@ module.exports = async (req, res) => {
       `Successfully fetched ${validSentences.length} subtitle entries`
     );
 
+    // Restore console.error
+    console.error = originalConsoleError;
+
     return res.status(200).json({
       success: true,
       sentences: validSentences,
@@ -78,6 +94,10 @@ module.exports = async (req, res) => {
       videoId: videoId,
     });
   } catch (error) {
+    // Restore console.error in case of error
+    if (typeof originalConsoleError !== "undefined") {
+      console.error = originalConsoleError;
+    }
     console.error("Error fetching transcript:", error);
 
     // Handle specific errors

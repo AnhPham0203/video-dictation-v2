@@ -12,9 +12,9 @@ export const TranscriptView = ({
   onSentenceClick,
 }: TranscriptViewProps) => {
   return (
-    <div className="h-full min-h-0">
-      <div className="h-full overflow-y-auto pr-2 transcript-scrollbar">
-        <div className="space-y-3 p-6">
+    <div className="flex h-full min-h-0 flex-col bg-card border border-border rounded-lg overflow-hidden">
+      <div className="flex-1 overflow-y-auto px-4 transcript-scrollbar">
+        <div className="space-y-3 py-4">
           {sentences.map((sentence, index) => (
             <Card
               key={index}
