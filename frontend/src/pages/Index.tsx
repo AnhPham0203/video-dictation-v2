@@ -8,6 +8,8 @@ import { TranscriptView } from "@/components/TranscriptView";
 
 import { TypingPanel } from "@/components/TypingPanel";
 
+import { SuggestedVideos } from "@/components/SuggestedVideos";
+
 import { Input } from "@/components/ui/input";
 
 import { Button } from "@/components/ui/button";
@@ -259,6 +261,16 @@ const Index = () => {
         });
       }
     }
+  };
+
+  const handleSuggestedVideoSelect = async (videoId: string) => {
+    const url = `https://www.youtube.com/watch?v=${videoId}`;
+    setVideoUrl(url);
+    setInputUrl(url);
+    await fetchCaptions(videoId);
+
+    // Scroll to top to see the video
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleNext = () => {
@@ -552,8 +564,8 @@ const Index = () => {
 
       {/* Main Content */}
 
-      <div className="container mx-auto px-4 py-6 h-[calc(100vh-140px)]">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
+      <div className="container mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-140px)]">
           {/* Left: Video Player */}
 
           <div className="relative flex flex-col gap-4 min-h-0">
@@ -744,6 +756,14 @@ const Index = () => {
               </TabsContent>
             </Tabs>
           </div>
+        </div>
+
+        {/* Suggested Videos Section */}
+        <div className="mt-8 pb-8">
+          <SuggestedVideos
+            onVideoSelect={handleSuggestedVideoSelect}
+            isLoading={isLoading}
+          />
         </div>
       </div>
     </div>
