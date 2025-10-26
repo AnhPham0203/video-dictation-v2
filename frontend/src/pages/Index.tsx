@@ -6,6 +6,8 @@ import { DictationPanel } from "@/components/DictationPanel";
 
 import { TranscriptView } from "@/components/TranscriptView";
 
+import { PlainTranscript } from "@/components/PlainTranscript";
+
 import { TypingPanel } from "@/components/TypingPanel";
 
 import { SuggestedVideos } from "@/components/SuggestedVideos";
@@ -566,62 +568,35 @@ const Index = () => {
 
       <div className="container mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-140px)]">
-          {/* Left: Video Player */}
+          {/* Left: Video Player + Plain Transcript */}
 
           <div className="relative flex flex-col gap-4 min-h-0">
-            <VideoPlayer
-              videoUrl={videoUrl}
-              seekTo={seekTo}
-              onPlaybackComplete={handlePlaybackComplete}
-              currentSegment={dictationSegment}
-              onReplayRequest={() => playCurrentSentence()}
-            />
+            {/* Video Player */}
+            <div className="relative">
+              <VideoPlayer
+                videoUrl={videoUrl}
+                seekTo={seekTo}
+                onPlaybackComplete={handlePlaybackComplete}
+                currentSegment={dictationSegment}
+                onReplayRequest={() => playCurrentSentence()}
+              />
 
-            <div
-              className={`absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center transition-opacity ${
-                isVideoCovered ? "opacity-100" : "opacity-0 pointer-events-none"
-              }`}
-            >
-              <p className="text-muted-foreground">Video is covered</p>
+              <div
+                className={`absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center transition-opacity ${
+                  isVideoCovered
+                    ? "opacity-100"
+                    : "opacity-0 pointer-events-none"
+                }`}
+              >
+                <p className="text-muted-foreground">Video is covered</p>
+              </div>
             </div>
 
-            {/* {sentences.length > 0 && (
-
-
-
-              <div className="bg-card p-4 rounded-lg border border-border">
-
-
-
-                <h2 className="text-lg font-semibold mb-2">
-
-
-
-                  {sentences[currentSentenceIndex]?.text}
-
-
-
-                </h2>
-
-
-
-                <p className="text-sm text-muted-foreground">
-
-
-
-                  Sentence {currentSentenceIndex + 1} of {sentences.length}
-
-
-
-                </p>
-
-
-
-              </div>
-
-
-
-            )} */}
+            {/* Plain Transcript */}
+            <PlainTranscript
+              sentences={sentences}
+              currentIndex={currentSentenceIndex}
+            />
           </div>
 
           {/* Right: Dictation/Transcript Panel */}
