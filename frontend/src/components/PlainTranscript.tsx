@@ -11,7 +11,7 @@ export const PlainTranscript = ({
   sentences,
   currentIndex,
 }: PlainTranscriptProps) => {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   return (
     <div className="flex flex-col border border-border rounded-lg overflow-hidden bg-card">

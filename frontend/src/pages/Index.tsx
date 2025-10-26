@@ -26,6 +26,8 @@ import { Link as LinkIcon, Loader2, Eye, EyeOff } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
 
+import { InstructionsModal } from "@/components/InstructionsModal";
+
 interface Sentence {
   text: string;
 
@@ -523,6 +525,8 @@ const Index = () => {
                 VideoDictation
               </h1>
 
+              <InstructionsModal />
+
               <div className="flex-1 flex gap-2 max-w-2xl">
                 <Input
                   placeholder="Paste YouTube URL here..."
@@ -566,7 +570,7 @@ const Index = () => {
 
       {/* Main Content */}
 
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-2">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-140px)]">
           {/* Left: Video Player + Plain Transcript */}
 
@@ -734,7 +738,7 @@ const Index = () => {
         </div>
 
         {/* Suggested Videos Section */}
-        <div className="mt-8 pb-8">
+        <div className="mt-0 pb-6">
           <SuggestedVideos
             onVideoSelect={handleSuggestedVideoSelect}
             isLoading={isLoading}
