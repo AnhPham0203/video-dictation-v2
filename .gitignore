@@ -16,6 +16,10 @@ frontend/npm-debug.log*
 frontend/yarn-debug.log*
 frontend/pnpm-debug.log*
 
+# Credentials
+api/google-credentials.json
+fastapi-react-todos-9c48ba40a11b.json
+
 # Editor & OS files
 .vscode/
 .idea/

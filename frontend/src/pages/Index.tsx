@@ -22,11 +22,12 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 import { Progress } from "@/components/ui/progress";
 
-import { Link as LinkIcon, Loader2, Eye, EyeOff } from "lucide-react";
+import { Link as LinkIcon, Loader2, Eye, EyeOff, FileText } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
 
 import { InstructionsModal } from "@/components/InstructionsModal";
+import { useNavigate } from "react-router-dom";
 
 interface Sentence {
   text: string;
@@ -129,6 +130,7 @@ const Index = () => {
   );
 
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const getYouTubeId = (url: string) => {
     const regExp =
@@ -526,6 +528,15 @@ const Index = () => {
               </h1>
 
               <InstructionsModal />
+
+              <Button
+                variant="outline"
+                onClick={() => navigate("/custom-text")}
+                className="flex items-center gap-2"
+              >
+                <FileText className="h-4 w-4" />
+                Custom Text
+              </Button>
 
               <div className="flex-1 flex gap-2 max-w-2xl">
                 <Input

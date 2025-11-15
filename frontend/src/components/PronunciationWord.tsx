@@ -98,9 +98,9 @@ export const PronunciationWord = ({ word }: PronunciationWordProps) => {
                 <AlertCircle className="h-5 w-5 mr-2 mt-0.5" />
                 <div className="flex-1">
                   <p className="text-sm">{error}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  {/* <p className="text-xs text-muted-foreground mt-1">
                     Multiple APIs tried. Check console for details.
-                  </p>
+                  </p> */}
                 </div>
               </div>
               <Button
