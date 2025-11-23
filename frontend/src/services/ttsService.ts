@@ -16,9 +16,16 @@ export interface TTSOptions {
   language?: string;
 }
 
+export interface SentenceTiming {
+  text: string;
+  start: number;
+  end: number | null; // End can be null for the last sentence
+}
+
 export interface TTSResponse {
   success: boolean;
   audio?: string;
+  sentences?: SentenceTiming[];
   format?: string;
   length?: number;
   error?: string;
@@ -117,22 +124,45 @@ export function splitIntoSentences(text: string): string[] {
     .map((abbr) => abbr.replace(/\./g, "\\."))
     .join("|");
 
-  // Split by sentence-ending punctuation, but not after abbreviations
-  // Use positive lookbehind to check if not preceded by abbreviation
-  const sentences = cleaned
-    .split(new RegExp(`(?<!${abbrevPattern})\\s*([.!?]+)\\s+`, "g"))
-    .filter((s) => s.trim().length > 0)
-    .map((s) => s.trim());
-
-  // If no sentences found (e.g., no punctuation), return the whole text as one sentence
-  if (sentences.length === 0) {
-    return [cleaned];
+  // Use Intl.Segmenter if available (best for modern browsers)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (typeof Intl !== "undefined" && (Intl as any).Segmenter) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const segmenter = new (Intl as any).Segmenter("en", { granularity: "sentence" });
+    const segments = segmenter.segment(cleaned);
+    const sentences = [];
+    for (const { segment } of segments) {
+      const trimmed = segment.trim();
+      if (trimmed.length > 0) {
+        sentences.push(trimmed);
+      }
+    }
+    return sentences;
   }
 
-  // Clean up sentences: remove standalone punctuation
-  return sentences
-    .map((s) => s.replace(/^[.!?]+$/, "").trim())
-    .filter((s) => s.length > 0);
+  // Fallback: Split by newlines and punctuation
+  const lines = cleaned.split(/\n+/);
+  const allSentences: string[] = [];
+
+  for (const line of lines) {
+    const cleanedLine = line.trim();
+    if (cleanedLine.length === 0) continue;
+
+    const matches = cleanedLine.match(new RegExp(`(?<!${abbrevPattern})[^.!?]+[.!?]+|[^.!?]+$`, "g"));
+
+    if (matches && matches.length > 0) {
+      matches.forEach(s => {
+        const trimmed = s.trim();
+        if (trimmed.length > 0) {
+          allSentences.push(trimmed);
+        }
+      });
+    } else {
+      allSentences.push(cleanedLine);
+    }
+  }
+
+  return allSentences;
 }
 
 /**
@@ -155,7 +185,7 @@ export function estimateSentenceDuration(text: string): number {
 }
 
 /**
- * Create sentence objects with timestamps from text
+ * Create sentence objects with timestamps from text (for preview or fallback)
  * Format compatible with YouTube transcript structure
  */
 export function createSentencesFromText(text: string): Array<{
@@ -315,4 +345,3 @@ export function stopWebSpeechAPI(): void {
     window.speechSynthesis.cancel();
   }
 }
-

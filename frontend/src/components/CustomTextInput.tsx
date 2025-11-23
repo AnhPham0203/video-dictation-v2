@@ -28,6 +28,7 @@ interface CustomTextInputProps {
   onTextChange: (text: string) => void;
   onGenerateAudio?: () => void;
   isGenerating?: boolean;
+  sentencePreview: string[];
 }
 
 export const CustomTextInput = ({
@@ -35,13 +36,13 @@ export const CustomTextInput = ({
   onTextChange,
   onGenerateAudio,
   isGenerating = false,
+  sentencePreview = [],
 }: CustomTextInputProps) => {
   const [savedTexts, setSavedTexts] = useState<SavedText[]>([]);
   const [isLoadDialogOpen, setIsLoadDialogOpen] = useState(false);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [saveTitle, setSaveTitle] = useState("");
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
-  const [sentencePreview, setSentencePreview] = useState<string[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
 
@@ -49,16 +50,6 @@ export const CustomTextInput = ({
   useEffect(() => {
     refreshSavedTexts();
   }, []);
-
-  // Update sentence preview when text changes
-  useEffect(() => {
-    if (text.trim()) {
-      const sentences = splitIntoSentences(text);
-      setSentencePreview(sentences);
-    } else {
-      setSentencePreview([]);
-    }
-  }, [text]);
 
   const refreshSavedTexts = () => {
     const texts = getSavedTexts();
@@ -336,4 +327,3 @@ export const CustomTextInput = ({
     </div>
   );
 };
-

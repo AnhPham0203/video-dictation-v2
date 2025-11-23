@@ -1,7 +1,11 @@
 import { Card } from "@/components/ui/card";
 
 interface TranscriptViewProps {
-  sentences: Array<{ text: string; translation: string; timestamp: string }>;
+  sentences: Array<{
+    text: string;
+    translation?: string; // Make translation optional
+    timestamp?: string;   // Make timestamp optional
+  }>;
   currentIndex: number;
   onSentenceClick: (index: number) => void;
 }

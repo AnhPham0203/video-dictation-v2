@@ -12,9 +12,9 @@ import { ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   generateAudio,
-  createSentencesFromText,
   generateAudioWithWebSpeechAPI,
   stopWebSpeechAPI,
+  splitIntoSentences,
   type TTSResponse,
 } from "@/services/ttsService";
 import { useNavigate } from "react-router-dom";
@@ -22,9 +22,9 @@ import { useNavigate } from "react-router-dom";
 interface Sentence {
   text: string;
   translation?: string;
-  timestamp: string;
+  timestamp?: string; // Timestamp is no longer generated client-side
   start: number;
-  end: number;
+  end: number | null; // End can be null for the last sentence
 }
 
 const SEGMENT_END_PADDING = 0.1; // Slightly trims the end so playback doesn't stop early.
@@ -36,6 +36,7 @@ const CustomText = () => {
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [currentTab, setCurrentTab] = useState("dictation");
   const [sentences, setSentences] = useState<Sentence[]>([]);
+  const [sentencePreview, setSentencePreview] = useState<string[]>([]);
   const [sentenceSessionId, setSentenceSessionId] = useState(0);
   const [currentSentenceIndex, setCurrentSentenceIndex] = useState(0);
   const [dictationMode, setDictationMode] = useState<number>(1);
@@ -52,21 +53,13 @@ const CustomText = () => {
   const lastSegmentRef = useRef<{ start: number; end: number } | null>(null);
   const { toast } = useToast();
 
-  // Update sentences when text changes (preview only, don't generate audio yet)
+  // Update sentence preview when text changes
   useEffect(() => {
     if (text.trim()) {
-      const newSentences = createSentencesFromText(text);
-      setSentences(newSentences);
-      // Reset to first sentence
-      if (newSentences.length > 0) {
-        setCurrentSentenceIndex(0);
-        setSentenceSessionId((prev) => prev + 1);
-        setCompletedSentences(new Set());
-      }
+      const sentences = splitIntoSentences(text);
+      setSentencePreview(sentences);
     } else {
-      setSentences([]);
-      setCurrentSentenceIndex(0);
-      setAudioUrl(null);
+      setSentencePreview([]);
     }
   }, [text]);
 
@@ -87,11 +80,20 @@ const CustomText = () => {
     try {
       const response: TTSResponse = await generateAudio(text);
 
-      if (response.success && response.audio) {
+      // Check for a successful response with all the required data
+      if (response.success && response.audio && Array.isArray(response.sentences)) {
         setAudioUrl(response.audio);
+        // Use the accurate sentences from the API response
+        setSentences(response.sentences);
+        
+        // Reset progress
+        setCurrentSentenceIndex(0);
+        setSentenceSessionId((prev) => prev + 1);
+        setCompletedSentences(new Set());
+
         toast({
           title: "Success",
-          description: "Audio generated successfully",
+          description: "Audio and sentence timings generated successfully",
         });
       } else if (response.error === "TTS_API_KEY_NOT_CONFIGURED") {
         // Offer Web Speech API as fallback
@@ -138,9 +140,22 @@ const CustomText = () => {
 
     setUseWebSpeechAPI(true);
     setTtsError(null);
+    setAudioUrl(null); // Ensure no old audio URL is used
 
-    // For Web Speech API, we can't get an audio URL
-    // Instead, we'll play it directly when needed
+    // Create mock sentence data from the preview
+    const mockSentences: Sentence[] = sentencePreview.map((s) => ({
+      text: s,
+      start: 0,
+      end: 0, // Timestamps are not used in this mode
+    }));
+
+    setSentences(mockSentences);
+
+    // Reset progress for the new session
+    setCurrentSentenceIndex(0);
+    setSentenceSessionId((prev) => prev + 1);
+    setCompletedSentences(new Set());
+
     toast({
       title: "Web Speech API Enabled",
       description:
@@ -201,9 +216,15 @@ const CustomText = () => {
 
     const segmentEnd = sentence2 ? sentence2.end : sentence1.end;
 
+    // If segmentEnd is null (last sentence), we pass null to play to the end.
+    const finalEndTime =
+      segmentEnd === null
+        ? null
+        : Math.max(sentence1.start, segmentEnd - SEGMENT_END_PADDING);
+
     const segment = {
       start: sentence1.start,
-      end: Math.max(sentence1.start, segmentEnd - SEGMENT_END_PADDING),
+      end: finalEndTime,
     };
 
     lastSegmentRef.current = segment;
@@ -257,8 +278,8 @@ const CustomText = () => {
         start: currentSentenceData.start,
         end:
           dictationMode === 2 && nextSentenceData
-            ? nextSentenceData.end - SEGMENT_END_PADDING
-            : currentSentenceData.end - SEGMENT_END_PADDING,
+            ? nextSentenceData.end
+            : currentSentenceData.end,
       }
     : null;
 
@@ -311,6 +332,7 @@ const CustomText = () => {
               onTextChange={setText}
               onGenerateAudio={handleGenerateAudio}
               isGenerating={isGeneratingAudio}
+              sentencePreview={sentencePreview}
             />
 
             {/* TTS Error / Web Speech API Option */}
@@ -467,4 +489,3 @@ const CustomText = () => {
 };
 
 export default CustomText;
-

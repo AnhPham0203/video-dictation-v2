@@ -7,9 +7,9 @@ import { Progress } from "@/components/ui/progress";
 interface AudioPlayerProps {
   audioUrl: string | null;
   onTimeUpdate?: (time: number) => void;
-  seekTo?: { start: number; end: number } | null;
+  seekTo?: { start: number; end: number | null } | null; // Allow end to be null
   onPlaybackComplete?: () => void;
-  currentSegment?: { start: number; end: number } | null;
+  currentSegment?: { start: number; end: number | null } | null; // Allow end to be null
   onReplayRequest?: () => void;
 }
 
@@ -26,12 +26,14 @@ export const AudioPlayer = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isLoading, setIsLoading] = useState(true); // Start with loading true
+  const [isReady, setIsReady] = useState(false); // New state to track if audio can be played
   const segmentIntervalRef = useRef<number | null>(null);
   const lastSegmentRef = useRef<{ start: number; end: number } | null>(null);
 
   // Reset state when audioUrl changes
   useEffect(() => {
     setIsLoading(true);
+    setIsReady(false); // Can't be ready if the source is changing
     setCurrentTime(0);
     setDuration(0);
     setIsPlaying(false);
@@ -43,9 +45,11 @@ export const AudioPlayer = ({
 
   // Play segment functionality
   const playSegment = useCallback(
-    (segment: { start: number; end: number }) => {
+    (segment: { start: number; end: number | null }) => {
       const audio = audioRef.current;
-      if (!audio) {
+      // Do not play if the audio element is not ready
+      if (!audio || !isReady) {
+        console.warn("playSegment called before audio is ready.");
         return;
       }
       lastSegmentRef.current = segment;
@@ -64,29 +68,30 @@ export const AudioPlayer = ({
         setIsPlaying(false);
       });
 
-      // Check if we've reached the end of the segment
-      const checkTime = window.setInterval(() => {
-        if (audio.currentTime >= segment.end) {
-          audio.pause();
-          clearInterval(checkTime);
-          segmentIntervalRef.current = null;
-          onPlaybackComplete?.();
-        }
-      }, 50);
-
-      segmentIntervalRef.current = checkTime;
+      // If segment.end is null, it means play to the end of the track.
+      // So, we only set an interval if segment.end is a valid number.
+      if (typeof segment.end === "number") {
+        const checkTime = window.setInterval(() => {
+          if (audio.currentTime >= segment.end!) {
+            audio.pause();
+            clearInterval(checkTime);
+            segmentIntervalRef.current = null;
+            onPlaybackComplete?.();
+          }
+        }, 50);
+        segmentIntervalRef.current = checkTime;
+      }
     },
-    [audioUrl, onPlaybackComplete]
+    [isReady, onPlaybackComplete]
   );
 
   // Handle seeking to specific timestamp
   useEffect(() => {
-    if (!seekTo || !audioRef.current) {
-      return;
+    // Only play segment if seekTo is defined and audio is ready to be played
+    if (seekTo && audioRef.current && isReady) {
+      playSegment(seekTo);
     }
-
-    playSegment(seekTo);
-  }, [seekTo, playSegment]);
+  }, [seekTo, playSegment, isReady]);
 
   // Keyboard shortcut: Control key for replay
   useEffect(() => {
@@ -126,7 +131,7 @@ export const AudioPlayer = ({
   }, []);
 
   const togglePlay = () => {
-    if (!audioRef.current) {
+    if (!audioRef.current || !isReady) {
       return;
     }
 
@@ -203,9 +208,13 @@ export const AudioPlayer = ({
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
         onLoadStart={() => setIsLoading(true)}
-        onCanPlay={() => setIsLoading(false)} // More reliable than loadedmetadata for removing spinner
+        onCanPlay={() => {
+          setIsLoading(false);
+          setIsReady(true);
+        }}
         onError={(e) => {
           console.error("Audio element error:", e);
+          setIsReady(false);
           setIsLoading(false);
         }}
         className="hidden"
@@ -224,7 +233,7 @@ export const AudioPlayer = ({
                   setCurrentTime(0);
                 }
               }}
-              disabled={!audioUrl || isLoading}
+              disabled={!audioUrl || isLoading || !isReady}
               className="rounded-full"
             >
               <RotateCcw className="h-4 w-4" />
@@ -234,7 +243,7 @@ export const AudioPlayer = ({
               size="lg"
               variant="default"
               onClick={togglePlay}
-              disabled={!audioUrl || isLoading}
+              disabled={!audioUrl || isLoading || !isReady}
               className="rounded-full w-16 h-16"
             >
               {isLoading ? (
@@ -254,7 +263,7 @@ export const AudioPlayer = ({
               max={duration || 100}
               step={0.1}
               onValueChange={handleSeek}
-              disabled={!audioUrl || isLoading}
+              disabled={!audioUrl || isLoading || !isReady}
               className="w-full"
             />
             <div className="flex items-center justify-between text-sm text-muted-foreground">
@@ -266,13 +275,16 @@ export const AudioPlayer = ({
           {/* Segment Info */}
           {currentSegment && (
             <div className="text-xs text-muted-foreground text-center">
-              Segment: {formatTime(currentSegment.start)} - {formatTime(currentSegment.end)}
+              Segment: {formatTime(currentSegment.start)} -{" "}
+              {formatTime(currentSegment.end)}
             </div>
           )}
         </div>
       ) : (
         <div className="aspect-video w-full flex items-center justify-center bg-muted min-h-[200px]">
-          <p className="text-muted-foreground">No audio available. Generate audio from text first.</p>
+          <p className="text-muted-foreground">
+            No audio available. Generate audio from text first.
+          </p>
         </div>
       )}
     </div>
